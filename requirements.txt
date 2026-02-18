@@ -1,0 +1,9 @@
+anthropic
+fastapi
+uvicorn
+llama-index
+chromadb
+beautifulsoup4
+html2text
+requests
+python-dotenv
