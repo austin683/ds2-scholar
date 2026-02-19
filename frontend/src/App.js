@@ -281,12 +281,12 @@ function App() {
         <div className="relative flex flex-col h-full min-w-[18rem]">
 
           {/* Title — absolutely positioned so it doesn't affect field layout */}
-          <div className="absolute top-0 left-0 right-0 h-[72px] flex items-end justify-center pb-[20px] pointer-events-none z-10">
+          <div className="absolute top-0 left-0 right-0 h-[72px] flex items-center justify-center border-b border-yellow-700/40 pointer-events-none z-10">
             <div className="text-yellow-500 text-2xl leading-tight" style={{ fontFamily: 'OptimusPrinceps, serif' }}>Player Stats</div>
           </div>
 
           {/* 9-row shared grid — pt-[72px] reserves space for the absolute title */}
-          <div className="flex-1 flex flex-col justify-start pt-[56px]">
+          <div className="flex-1 flex flex-col justify-center pt-[72px] pb-4">
           <div
             className="px-5 py-3 grid gap-x-3 gap-y-2"
             style={{ gridTemplateColumns: '6rem 1fr', gridTemplateRows: 'repeat(9, auto)', alignItems: 'stretch' }}
@@ -350,10 +350,8 @@ function App() {
             </div>
 
           </div>{/* end grid */}
-          </div>{/* end centering wrapper */}
 
-          {/* Sidebar footer */}
-          <div className="px-5 py-4 shrink-0" style={{ minHeight: '75px' }}>
+          <div className="px-5 pt-4 pb-4">
             <button
               onClick={handleClearStats}
               className="w-full bg-yellow-600 hover:bg-yellow-500 active:bg-yellow-700 text-neutral-900 font-semibold text-xs rounded py-2 transition-colors"
@@ -361,6 +359,8 @@ function App() {
               Clear Stats
             </button>
           </div>
+
+          </div>{/* end centering wrapper */}
         </div>
       </aside>
 
@@ -386,7 +386,7 @@ function App() {
           <h1 className="flex items-center gap-2 text-yellow-500 text-2xl leading-tight tracking-wide" style={{ fontFamily: 'OptimusPrinceps, serif' }}>
             Scholar
             <span className="text-neutral-500 text-xl">·</span>
-            <span className="text-neutral-400 text-xl">Dark Souls II Wiki</span>
+            <span className="text-neutral-400 text-xl">Dark Souls II</span>
           </h1>
 
           {messages.length > 0 && (
@@ -402,13 +402,27 @@ function App() {
         {/* Messages */}
         <main className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
           {messages.length === 0 && !loading && (
-            <div className="flex flex-1 flex-col items-center justify-center gap-8 py-8">
+            <div className="relative flex flex-1 flex-col items-center justify-center gap-8 py-8">
+
+              {/* Info tooltip — top-right of home screen only */}
+              <div className="absolute top-0 right-0 group">
+                <button className="w-6 h-6 flex items-center justify-center rounded-full border border-neutral-600 text-neutral-500 text-xs hover:border-neutral-400 hover:text-neutral-300 transition-colors">
+                  ?
+                </button>
+                <div className="pointer-events-none absolute right-0 top-8 w-64 bg-neutral-800 border border-neutral-600 rounded-lg px-3 py-2.5 text-xs text-neutral-300 leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  A wiki companion for Dark Souls II: Scholar of the First Sin. Ask about items, bosses, builds, and mechanics. Answers are sourced directly from the Fextralife wiki. Fill in your stats on the left for personalized advice.
+                </div>
+              </div>
+
               <div className="text-center">
-                <h2 className="text-yellow-500 text-5xl mb-2" style={{ fontFamily: 'OptimusPrinceps, serif' }}>
-                  Scholar - Dark Souls II
+                <h2 className="text-yellow-500 text-[3.25rem] mb-1" style={{ fontFamily: 'OptimusPrinceps, serif' }}>
+                  Scholar
                 </h2>
-                <p className="text-neutral-500 text-base tracking-widest uppercase" style={{ fontFamily: 'OptimusPrinceps, serif' }}>
+                <p className="text-neutral-500 text-base tracking-widest uppercase mb-3" style={{ fontFamily: 'OptimusPrinceps, serif' }}>
                   Seek Guidance from the Archives
+                </p>
+                <p className="text-neutral-400 text-sm max-w-sm mx-auto leading-relaxed">
+                  AI wiki companion for Scholar of the First Sin
                 </p>
               </div>
 
@@ -537,8 +551,8 @@ function App() {
               onKeyDown={handleKeyDown}
               rows={1}
               disabled={loading}
-              placeholder="Ask the Scholar... (Enter to send, Shift+Enter for new line)"
-              className="flex-1 bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-2.5 text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-yellow-600 resize-none leading-relaxed disabled:opacity-50"
+              placeholder="Ask the Scholar... (Enter to send, Shift+Enter for new line, / for commands)"
+              className="flex-1 bg-neutral-700 border border-neutral-600 rounded-lg px-3 py-2.5 text-sm text-neutral-100 placeholder-neutral-400 focus:outline-none focus:border-yellow-600 resize-none leading-relaxed disabled:opacity-50"
               style={{ minHeight: '42px', maxHeight: '160px', overflowY: 'auto' }}
               onInput={e => {
                 e.target.style.height = 'auto';
@@ -575,7 +589,7 @@ function App() {
               onClick={e => e.stopPropagation()}
             >
               <h2
-                className="text-yellow-500 text-3xl text-center mb-2"
+                className="text-yellow-500 text-4xl text-center mb-3"
                 style={{ fontFamily: 'OptimusPrinceps, serif' }}
               >
                 Level Up
@@ -625,14 +639,14 @@ function App() {
                 /* Step 2 — distribute levels */
                 <>
                   {/* Soul level + remaining counter */}
-                  <div className="text-center mb-5 space-y-1.5">
-                    <p className="text-neutral-400 text-sm">
+                  <div className="text-center mb-6 space-y-1.5">
+                    <p className="text-neutral-400 text-base">
                       Soul Level:&nbsp;
                       <span className="text-neutral-200">{currentSL || '—'}</span>
                       {spent > 0 && <span className="text-yellow-400"> → {currentSL + spent}</span>}
                     </p>
                     <p
-                      className={`text-xl ${remaining > 0 ? 'text-yellow-400' : 'text-neutral-500'}`}
+                      className={`text-[1.35rem] ${remaining > 0 ? 'text-yellow-400' : 'text-neutral-500'}`}
                       style={{ fontFamily: 'OptimusPrinceps, serif' }}
                     >
                       {remaining} level{remaining !== 1 ? 's' : ''} remaining
@@ -640,7 +654,7 @@ function App() {
                   </div>
 
                   {/* Stats grid — 3 columns */}
-                  <div className="grid grid-cols-3 gap-x-4 gap-y-5 mb-6">
+                  <div className="grid grid-cols-3 gap-x-6 gap-y-5 mb-5 mx-auto" style={{ width: 'fit-content' }}>
                     {STAT_FIELDS.map(({ key, label, icon }) => {
                       const draftVal = parseInt(levelDraft[key]) || 0;
                       const origVal = parseInt(stats[key]) || 0;
@@ -648,7 +662,7 @@ function App() {
                       return (
                         <div key={key} className="flex flex-col items-center gap-1.5">
                           <label className="flex items-center gap-1.5 text-xs text-neutral-400 uppercase tracking-wider">
-                            <img src={icon} alt={label} className="w-8 h-8 object-contain" />
+                            <img src={icon} alt={label} className="w-10 h-10 object-contain" />
                             {label}
                           </label>
                           <div className="flex items-center gap-2">
@@ -675,7 +689,7 @@ function App() {
                   </div>
 
                   {/* Clear selection */}
-                  <div className="flex justify-center mb-6">
+                  <div className="flex justify-center mb-10">
                     <button
                       onClick={() => setLevelDraft({ ...stats })}
                       disabled={spent === 0}

@@ -71,6 +71,30 @@ def health():
     return {"status": "ok", "message": "DS2 Scholar is ready."}
 
 
+def _build_term_query(question: str, chat_history: Optional[list]) -> str:
+    """
+    Build the string used for keyword/term extraction (not for semantic search).
+    Prepends the most recent user message from chat history so that follow-up
+    queries using pronouns ("Where will he be?") still carry proper nouns
+    ("Gavlan") from the previous turn.
+    """
+    if not chat_history:
+        return question
+    # Find the last user message in history
+    for msg in reversed(chat_history):
+        if isinstance(msg, dict) and msg.get("role") == "user":
+            prev = msg.get("content", "")
+            # Only prepend if the current question looks like a follow-up
+            # (short, contains a pronoun, or has fewer than 3 capitalised words)
+            import re as _re
+            has_pronoun = bool(_re.search(r"\b(he|she|it|they|him|her|them|his|its)\b", question, _re.I))
+            caps_count = len(_re.findall(r"\b[A-Z][a-z]{2,}", question))
+            if has_pronoun or caps_count < 2:
+                return f"{prev} {question}"
+            break
+    return question
+
+
 @app.post("/ask", response_model=AskResponse)
 def ask_question(request: AskRequest):
     """
@@ -87,7 +111,8 @@ def ask_question(request: AskRequest):
                 context = format_player_context(stats_dict)
                 question = f"{context}\n\nQuestion: {request.question}"
 
-        answer = ask(index, question, chat_history=request.chat_history)
+        term_query = _build_term_query(request.question, request.chat_history)
+        answer = ask(index, question, chat_history=request.chat_history, raw_question=term_query)
         return AskResponse(answer=answer)
 
     except Exception as e:
@@ -106,8 +131,10 @@ def ask_stream(request: AskRequest):
             context = format_player_context(stats_dict)
             question = f"{context}\n\nQuestion: {request.question}"
 
+    term_query = _build_term_query(request.question, request.chat_history)
+
     def generate():
-        for chunk in stream_ask(index, question, chat_history=request.chat_history):
+        for chunk in stream_ask(index, question, chat_history=request.chat_history, raw_question=term_query):
             yield f"data: {json.dumps(chunk)}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")

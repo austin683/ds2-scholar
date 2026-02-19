@@ -54,6 +54,7 @@ def format_player_context(stats: dict) -> str:
     Missing fields are simply omitted.
     """
     lines = ["=== Player Stats ==="]
+    lines.append("Game Version: Scholar of the First Sin (SotFS)")
 
     # Soul info
     if stats.get("soul_level"):
