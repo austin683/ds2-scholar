@@ -17,10 +17,16 @@ from backend.utils import get_soul_memory_tier, format_player_context
 
 app = FastAPI(title="DS2 Scholar API")
 
-# Allow React frontend to talk to backend
+# Allow React frontend to talk to backend.
+# ALLOWED_ORIGINS is a comma-separated list of origins (no trailing slashes).
+# Add the Vercel URL and any ngrok URLs to the env var when running for remote access.
+# e.g. ALLOWED_ORIGINS=https://ds2-scholar.vercel.app,http://localhost:3001
+_default_origins = "http://localhost:3000,http://localhost:3001,http://localhost:8001"
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", _default_origins).split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:8001"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
