@@ -410,7 +410,7 @@ function App() {
                   ?
                 </button>
                 <div className="pointer-events-none absolute right-0 top-8 w-64 bg-neutral-800 border border-neutral-600 rounded-lg px-3 py-2.5 text-xs text-neutral-300 leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                  A wiki companion for Dark Souls II: Scholar of the First Sin. Ask about items, bosses, builds, and mechanics. Answers are sourced directly from the Fextralife wiki. Fill in your stats on the left for personalized advice.
+                  Ask about items, bosses, builds, and mechanics. Answers are sourced directly from the Fextralife wiki. Fill in your stats on the left for personalized advice.
                 </div>
               </div>
 
