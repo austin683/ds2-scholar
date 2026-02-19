@@ -282,7 +282,10 @@ function App() {
 
           {/* Title — pinned top */}
           <div className="absolute top-0 left-0 right-0 h-[72px] flex items-end justify-center pb-3 pointer-events-none z-10">
-            <div className="text-yellow-500 text-2xl leading-tight" style={{ fontFamily: 'OptimusPrinceps, serif' }}>Player Stats</div>
+            <div className="flex flex-col items-center gap-1">
+                <div className="text-yellow-500 text-2xl leading-tight" style={{ fontFamily: 'OptimusPrinceps, serif' }}>Player Stats</div>
+                <div className="h-[1.5px] w-44" style={{ background: 'linear-gradient(to right, transparent, #ca8a04ff, transparent)' }} />
+              </div>
           </div>
 
           {/* Grid + button — flow from just below title, space absorbs at bottom */}
@@ -403,7 +406,7 @@ function App() {
         {/* Messages */}
         <main className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3">
           {messages.length === 0 && !loading && (
-            <div className="relative flex flex-1 flex-col items-center justify-center gap-8 py-8">
+            <div className="relative flex flex-1 flex-col items-center justify-center gap-5 py-8">
 
               {/* Info tooltip — top-right of home screen only */}
               <div className="absolute top-0 right-0 group">
@@ -422,17 +425,17 @@ function App() {
                 <p className="text-neutral-500 text-base tracking-widest uppercase mb-3" style={{ fontFamily: 'OptimusPrinceps, serif' }}>
                   Seek Guidance from the Archives
                 </p>
-                <p className="text-neutral-400 text-sm max-w-sm mx-auto leading-relaxed">
+                <p className="text-neutral-400 text-sm max-w-sm mx-auto leading-relaxed mb-1">
                   AI wiki companion for Scholar of the First Sin
                 </p>
               </div>
 
-              <div className="w-full max-w-lg grid grid-cols-2 gap-2">
+              <div className="w-full max-w-md grid grid-cols-2 gap-2">
                 {[
-                  { label: 'Check Soul Memory Tier', action: handleCheckSoulMemory },
                   { label: 'Soul Memory explained', q: 'How does Soul Memory work and how does it affect matchmaking?' },
+                  { label: 'Check Soul Memory Tier', action: handleCheckSoulMemory },
                   { label: 'How to beat The Pursuer?', q: 'How do I beat The Pursuer boss in Dark Souls 2?' },
-                  { label: 'Best PvE build?', q: 'What is a good beginner PvE build for Dark Souls 2?' },
+                  { label: 'Best starting class?', q: 'What is the best starting class for a beginner in Dark Souls 2?' },
                   { label: 'Where to farm souls?', q: 'What are the best places to farm souls early on?' },
                   { label: 'ADP & iframes explained', q: 'How does Adaptability affect dodge roll iframes?' },
                 ].map(({ label, q, action }) => (
