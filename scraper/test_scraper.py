@@ -1,3 +1,11 @@
+"""
+Test scraper: pulls a handful of weapon pages and converts tables to
+embedding-friendly text using BeautifulSoup table parsing instead of
+relying on html2text for table conversion.
+
+Saves output to knowledge_base_test/ so it doesn't touch the live KB.
+"""
+
 import requests
 import time
 import os
@@ -5,37 +13,25 @@ import re
 from bs4 import BeautifulSoup
 import html2text
 
-# Config
 BASE_URL = "https://darksouls2.wiki.fextralife.com"
-OUTPUT_DIR = os.path.expanduser("~/Desktop/ds2_scholar/knowledge_base")
-DELAY = 1.5
+OUTPUT_DIR = os.path.expanduser("~/Desktop/ds2_scholar/knowledge_base_test")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# html2text converter settings — tables are handled via custom parser
+# html2text for non-table content — tables are handled ourselves
 converter = html2text.HTML2Text()
 converter.ignore_links = False
 converter.ignore_images = True
 converter.body_width = 0
 converter.ignore_tables = True  # We replace tables with custom blocks first
 
-# Track visited URLs
-visited = set()
-
-# Junk pages to skip
-SKIP_PATTERNS = [
-    "Media", "Gallery", "Stream", "Fan+Art", "Fan_Art", "Comedy",
-    "Chatroom", "Player+ID", "Steam+Id", "Forum", "forum",
-    "talk:", "Talk:", "user:", "User:", "file:", "File:",
-    "image:", "Image:", "template:", "Template:",
-    "category:", "Category:", "special:", "Special:",
-    "widget:", "Widget:", "action=", "mailto:",
-    ".jpg", ".png", ".gif", ".css", ".js",
-    "News", "Review", "Article", "Podcast", "Video",
-    "Shop", "Affiliate", "About+Fextralife",
-    "Request+a+Wiki", "All+Wikis",
+TEST_PAGES = [
+    "https://darksouls2.wiki.fextralife.com/Fire+Longsword",
+    "https://darksouls2.wiki.fextralife.com/Broadsword",
+    "https://darksouls2.wiki.fextralife.com/Sun+Sword",
+    "https://darksouls2.wiki.fextralife.com/Estoc",
+    "https://darksouls2.wiki.fextralife.com/Blacksteel+Katana",
 ]
 
-# Phrases that mark the start of junk at the bottom
 CUTOFF_PHRASES = [
     "Join the page discussion",
     "Tired of anon posting?",
@@ -223,7 +219,7 @@ def _parse_stats_widget(grid):
                     parts.append(f"{label} {val}")
             if parts:
                 lines.append("Requirements: " + ", ".join(parts))
-            awaiting_req_row = False  # Only the first row after the header
+            awaiting_req_row = False
 
         elif len(unique) == 2:
             label, value = unique[0], unique[1]
@@ -240,8 +236,8 @@ def _parse_stats_widget(grid):
 def replace_tables_with_content(main_content):
     """
     Walk all <table> elements and replace each with either:
-      - plain <div><p>…</p></div>  (stats widget → clean prose)
-      - <pre> markdown block        (upgrade table + other tables)
+      - plain <p> text  (stats widget)
+      - <pre> markdown  (upgrade table and other tables)
     """
     for table in main_content.find_all("table"):
         grid = _pad_grid(_build_grid(table))
@@ -253,6 +249,7 @@ def replace_tables_with_content(main_content):
         if _is_stats_widget(grid):
             text = _parse_stats_widget(grid)
             if text:
+                # One <p> per line so html2text renders them as separate paragraphs
                 inner = "".join(f"<p>{line}</p>" for line in text.splitlines() if line.strip())
                 replacement = BeautifulSoup(f"<div>{inner}</div>", "html.parser")
                 table.replace_with(replacement)
@@ -278,178 +275,78 @@ def replace_tables_with_content(main_content):
 
 
 # ---------------------------------------------------------------------------
-# URL helpers
+# Prose cleaning
 # ---------------------------------------------------------------------------
 
-def should_skip(url):
-    for pattern in SKIP_PATTERNS:
-        if pattern in url:
-            return True
-    return False
-
-def url_to_filename(url):
-    name = url.replace(BASE_URL, "").strip("/")
-    name = re.sub(r'[^\w\-]', '_', name)
-    name = re.sub(r'_+', '_', name).strip('_')
-    return name[:120]
-
-def already_scraped(url):
-    filename = url_to_filename(url)
-    filepath = os.path.join(OUTPUT_DIR, f"{filename}.md")
-    return os.path.exists(filepath)
-
-def clean_markdown(markdown):
-    # Strip footer junk (comments, nav, etc.)
+def clean_prose(markdown):
+    """
+    Strip footer junk and normalize whitespace.
+    Does NOT strip before the first heading — the content block already
+    excludes site nav, and the stats widget lives before the first heading.
+    """
     for phrase in CUTOFF_PHRASES:
         if phrase in markdown:
             markdown = markdown[:markdown.index(phrase)].rstrip()
             break
 
-    # Collapse 3+ blank lines to 2
     markdown = re.sub(r'\n{3,}', '\n\n', markdown)
     return markdown.strip()
 
-def get_wiki_links(soup):
-    links = []
-    for a in soup.find_all("a", href=True):
-        href = a["href"]
 
-        if href.startswith("/") and not href.startswith("//"):
-            full_url = BASE_URL + href
-        elif href.startswith(BASE_URL):
-            full_url = href
-        else:
-            continue
-
-        if not full_url.startswith(BASE_URL):
-            continue
-
-        if "#" in full_url or "?" in full_url:
-            continue
-
-        if should_skip(full_url):
-            continue
-
-        if full_url not in visited:
-            links.append(full_url)
-
-    return links
+# ---------------------------------------------------------------------------
+# Scraper
+# ---------------------------------------------------------------------------
 
 def scrape_page(url):
-    filename = url_to_filename(url)
-    filepath = os.path.join(OUTPUT_DIR, f"{filename}.md")
+    headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
+    response = requests.get(url, headers=headers, timeout=15)
 
-    try:
-        headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
-        response = requests.get(url, headers=headers, timeout=15)
+    if response.status_code != 200:
+        print(f"  [FAIL] HTTP {response.status_code}")
+        return
 
-        if response.status_code != 200:
-            print(f"  [FAIL] HTTP {response.status_code}")
-            return []
+    soup = BeautifulSoup(response.text, "html.parser")
 
-        soup = BeautifulSoup(response.text, "html.parser")
+    main_content = (
+        soup.find("div", {"id": "wiki-content-block"}) or
+        soup.find("div", {"class": "wiki-content"}) or
+        soup.find("article") or
+        soup.find("main")
+    )
 
-        # Get links before stripping content
-        links = get_wiki_links(soup)
+    if not main_content:
+        print("  [NO CONTENT]")
+        return
 
-        # Extract main wiki content block only
-        main_content = (
-            soup.find("div", {"id": "wiki-content-block"}) or
-            soup.find("div", {"class": "wiki-content"}) or
-            soup.find("article") or
-            soup.find("main")
-        )
+    replace_tables_with_content(main_content)
 
-        if not main_content:
-            print(f"  [NO CONTENT] Skipping")
-            return links
+    markdown = converter.handle(str(main_content))
+    markdown = clean_prose(markdown)
 
-        # Replace tables with clean text/markdown blocks before html2text
-        replace_tables_with_content(main_content)
+    if len(markdown.strip()) < 100:
+        print("  [EMPTY]")
+        return
 
-        # Convert to markdown and clean
-        markdown = converter.handle(str(main_content))
-        markdown = clean_markdown(markdown)
+    name = url.replace(BASE_URL, "").strip("/")
+    name = re.sub(r'[^\w\-]', '_', name)
+    name = re.sub(r'_+', '_', name).strip('_')
+    filepath = os.path.join(OUTPUT_DIR, f"{name[:120]}.md")
 
-        # Skip if barely any content remains
-        if len(markdown.strip()) < 100:
-            print(f"  [EMPTY] Skipping")
-            return links
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(f"# Source: {url}\n\n")
+        f.write(markdown)
 
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(f"# Source: {url}\n\n")
-            f.write(markdown)
+    print(f"  [OK] -> {filepath}")
 
-        return links
-
-    except Exception as e:
-        print(f"  [ERROR] {e}")
-        return []
 
 def main():
-    seed_pages = [
-        "https://darksouls2.wiki.fextralife.com/Weapons",
-        "https://darksouls2.wiki.fextralife.com/Magic",
-        "https://darksouls2.wiki.fextralife.com/Hexes",
-        "https://darksouls2.wiki.fextralife.com/Armor",
-        "https://darksouls2.wiki.fextralife.com/Rings",
-        "https://darksouls2.wiki.fextralife.com/Items",
-        "https://darksouls2.wiki.fextralife.com/Bosses",
-        "https://darksouls2.wiki.fextralife.com/Locations",
-        "https://darksouls2.wiki.fextralife.com/NPCs",
-        "https://darksouls2.wiki.fextralife.com/Enemies",
-        "https://darksouls2.wiki.fextralife.com/Builds",
-        "https://darksouls2.wiki.fextralife.com/Stats",
-        "https://darksouls2.wiki.fextralife.com/Shields",
-        "https://darksouls2.wiki.fextralife.com/Covenants",
-        "https://darksouls2.wiki.fextralife.com/Merchants",
-        "https://darksouls2.wiki.fextralife.com/Bonfires",
-        "https://darksouls2.wiki.fextralife.com/Game+Progress+Route",
-        "https://darksouls2.wiki.fextralife.com/Upgrades",
-    ]
+    print(f"Test scrape: {len(TEST_PAGES)} pages -> {OUTPUT_DIR}\n")
+    for url in TEST_PAGES:
+        print(f"Scraping: {url}")
+        scrape_page(url)
+        time.sleep(1.5)
+    print("\nDone. Check knowledge_base_test/ and compare with knowledge_base/.")
 
-    queue = [p for p in seed_pages if p not in visited]
-
-    print(f"Starting full DS2 wiki crawl from {len(seed_pages)} seed pages...")
-    print(f"Saving to: {OUTPUT_DIR}")
-    print(f"Skipping already downloaded files.\n")
-
-    scraped_count = 0
-    skipped_count = 0
-
-    while queue:
-        url = queue.pop(0)
-
-        if url in visited:
-            continue
-
-        visited.add(url)
-
-        if not url.startswith(BASE_URL):
-            continue
-
-        if should_skip(url):
-            continue
-
-        if already_scraped(url):
-            skipped_count += 1
-            print(f"[SKIP] {url_to_filename(url)}")
-            continue
-
-        print(f"[{scraped_count + 1}] {url_to_filename(url)}")
-        new_links = scrape_page(url)
-        scraped_count += 1
-
-        for link in new_links:
-            if link not in visited and link not in queue:
-                queue.append(link)
-
-        print(f"  [OK] Queue: {len(queue)} remaining")
-        time.sleep(DELAY)
-
-    print(f"\nDone!")
-    print(f"Scraped: {scraped_count} | Skipped: {skipped_count}")
-    print(f"Files in: {OUTPUT_DIR}")
 
 if __name__ == "__main__":
     main()
