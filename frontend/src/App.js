@@ -354,7 +354,7 @@ function App() {
           </div>{/* end grid */}
 
           {/* Clear Stats — immediately below grid */}
-          <div className="pt-7 pb-5 flex-none">
+          <div className="pt-6 pb-5 flex-none">
             <button
               onClick={handleClearStats}
               className="w-full bg-yellow-600 hover:bg-yellow-500 active:bg-yellow-700 text-neutral-900 font-semibold text-xs rounded-md py-2 transition-colors"

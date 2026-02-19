@@ -28,6 +28,17 @@ EMBED_MODEL = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
 _KB_FILENAMES = None
 
 
+def _norm_fname(fname: str) -> str:
+    """
+    Normalize a filename for deduplication.
+    Collapses URL-encoding (_27_ → _) and repeated underscores so both
+    encoded and plain variants of the same file map to the same key.
+    e.g. "No_Man_27s_Wharf.md" and "No_Man_s_Wharf.md" → same key.
+    """
+    n = re.sub(r"_[0-9a-f]{2}_?", "_", fname.lower())
+    return re.sub(r"_+", "_", n)
+
+
 def _get_kb_filenames() -> list:
     """
     Return a cached, deduplicated list of .md filenames in the knowledge base.
@@ -41,17 +52,34 @@ def _get_kb_filenames() -> list:
     global _KB_FILENAMES
     if _KB_FILENAMES is None:
         all_files = [f for f in os.listdir(KNOWLEDGE_BASE_DIR) if f.endswith(".md")]
-        # Normalize: collapse _XX_ URL-encoding sequences (e.g. _27_ → '', _2C_ → '')
-        # then collapse repeated underscores so both variants map to the same key.
-        def _norm(fname: str) -> str:
-            n = re.sub(r"_[0-9a-f]{2}_?", "_", fname.lower())
-            return re.sub(r"_+", "_", n)
-
         seen: dict = {}  # norm_key → fname; later (alphabetically) wins
         for fname in sorted(all_files):
-            seen[_norm(fname)] = fname  # plain _s_ sorts after _27s_, so it wins
+            seen[_norm_fname(fname)] = fname  # plain _s_ sorts after _27s_, so it wins
         _KB_FILENAMES = list(seen.values())
     return _KB_FILENAMES
+
+
+# DS2 stat abbreviations that BGE-small doesn't reliably bridge to the full word.
+# Applied to the semantic query only (not keyword/mechanic extraction) so that
+# "INT" → "Intelligence" improves embedding similarity without affecting filename matching.
+_STAT_ABBREVS: list = [
+    (r"\bINT\b", "Intelligence"),
+    (r"\bSTR\b", "Strength"),
+    (r"\bDEX\b", "Dexterity"),
+    (r"\bFTH\b", "Faith"),
+    (r"\bADP\b", "Adaptability"),
+    (r"\bATN\b", "Attunement"),
+    (r"\bEND\b", "Endurance"),
+    (r"\bVGR\b", "Vigor"),
+    (r"\bVIT\b", "Vitality"),
+]
+
+
+def _expand_stat_abbrevs(text: str) -> str:
+    """Expand uppercase DS2 stat abbreviations for better semantic embedding quality."""
+    for pattern, replacement in _STAT_ABBREVS:
+        text = re.sub(pattern, replacement, text)
+    return text
 
 
 def get_index():
@@ -205,8 +233,10 @@ MECHANIC_TERM_MAP: dict = {
     # Combat mechanics
     "power stance": ["Power_Stance.md"],
     "powerstance":  ["Power_Stance.md"],
-    "two hand":     ["Controls.md", "Combat.md"],
-    "two-hand":     ["Controls.md", "Combat.md"],
+    "two hand":     ["Strength.md", "Controls.md", "Combat.md"],
+    "two-hand":     ["Strength.md", "Controls.md", "Combat.md"],
+    "two handing":  ["Strength.md"],
+    "two-handing":  ["Strength.md"],
     "backstab":     ["Combat.md"],
     "riposte":      ["Combat.md"],
     "parry":        ["Combat.md"],
@@ -241,12 +271,16 @@ MECHANIC_TERM_MAP: dict = {
     "dark magic":   ["Hexes.md"],
     "dark spell":   ["Hexes.md"],
     "dark spells":  ["Hexes.md"],
-    "sorcery":      ["Sorceries.md"],
-    "sorceries":    ["Sorceries.md"],
-    "miracle":      ["Miracles.md"],
-    "miracles":     ["Miracles.md"],
-    "pyromancy":    ["Pyromancies.md"],
-    "pyromancies":  ["Pyromancies.md"],
+    "sorcery trainer":  ["Carhillion_of_the_Fold.md"],
+    "sorcery":          ["Sorceries.md"],
+    "sorceries":        ["Sorceries.md"],
+    "hex trainer":      ["Felkin_the_Outcast.md"],
+    "miracle trainer":  ["Licia_of_Lindeldt.md"],
+    "miracle":          ["Miracles.md"],
+    "miracles":         ["Miracles.md"],
+    "pyromancy trainer": ["Rosabeth_of_Melfia.md"],
+    "pyromancy":        ["Pyromancies.md"],
+    "pyromancies":      ["Pyromancies.md"],
     # Weapon upgrade / crafting
     "upgrade":      ["Upgrades.md"],
     "upgrades":     ["Upgrades.md"],
@@ -258,12 +292,41 @@ MECHANIC_TERM_MAP: dict = {
     "torch":        ["Torch.md"],
     "pharros":      ["Pharros_Lockstone.md"],
     "agape":        ["Agape_Ring.md"],
+    "fragrant branch": ["Fragrant_Branch_of_Yore.md"],
+    "branch of yore":  ["Fragrant_Branch_of_Yore.md"],
+    "unpetrify":       ["Fragrant_Branch_of_Yore.md"],
+    # DLC areas — embedding model fails to bridge short area names to DLC pages
+    "brume tower":     ["Brume_Tower.md", "Crown_of_the_Old_Iron_King.md"],
+    "sunken king":     ["Crown_of_the_Sunken_King.md"] if os.path.exists(os.path.join(KNOWLEDGE_BASE_DIR, "Crown_of_the_Sunken_King.md")) else [],
+    "ivory king":      ["Crown_of_the_Ivory_King.md"] if os.path.exists(os.path.join(KNOWLEDGE_BASE_DIR, "Crown_of_the_Ivory_King.md")) else [],
+    # Death / soul recovery — bloodstain mechanic
+    "bloodstain":      ["Soul_Memory.md", "Hollowing.md"],
+    "blood stain":     ["Soul_Memory.md", "Hollowing.md"],
+    "recover souls":   ["Soul_Memory.md", "Hollowing.md"],
+    "lost souls":      ["Soul_Memory.md", "Hollowing.md"],
+    "retrieve souls":  ["Soul_Memory.md", "Hollowing.md"],
+    # Rings — embedding model misses soul-gain rings on indirect "level up faster" queries
+    "silver serpent": ["Covetous_Silver_Serpent_Ring.md"],
+    "covetous silver": ["Covetous_Silver_Serpent_Ring.md"],
+    "soul gain":    ["Covetous_Silver_Serpent_Ring.md"],
+    "more souls":   ["Covetous_Silver_Serpent_Ring.md"],
+    "level up faster": ["Covetous_Silver_Serpent_Ring.md"],
+    "level faster": ["Covetous_Silver_Serpent_Ring.md"],
+    "farm souls":   ["Covetous_Silver_Serpent_Ring.md"],
+    "soul farming": ["Covetous_Silver_Serpent_Ring.md"],
+    "gold serpent": ["Covetous_Gold_Serpent_Ring.md"],
+    "item discovery ring": ["Covetous_Gold_Serpent_Ring.md"],
     # NPCs — indirect item relationships the embedding model fails to bridge
     # "mcduff's workshop key" → the key is Bastille Key (Belfry Luna)
+    # "no man" triggers on "No Man's Wharf" and fetches Carhillion's page because the
+    # embedding model can't bridge a location-name query to an unnamed NPC's requirement page
+    # (Carhillion ranks ~17th in semantic search even with a clean index).
+    "no man":              ["Carhillion_of_the_Fold.md", "No_Man_s_Wharf.md"],
     "mcduff":              ["Bastille_Key.md", "Steady_Hand_McDuff.md", "McDuff_s_Workshop.md"],
     "blacksmith mcduff":   ["Steady_Hand_McDuff.md", "Bastille_Key.md"],
     "lenigrast":           ["Blacksmith_Lenigrast.md", "Lenigrast_s_Key.md"],
     "blacksmith lenigrast": ["Blacksmith_Lenigrast.md", "Lenigrast_s_Key.md"],
+    "navlaan":             ["Royal_Sorcerer_Navlaan.md"],
     "ornifex":             ["Weaponsmith_Ornifex.md"],
     "straid":              ["Straid_of_Olaphis.md"],
     "felkin":              ["Felkin_the_Outcast.md"],
@@ -323,7 +386,7 @@ def _find_keyword_files(terms: list) -> list:
          words (e.g. "weapon", "ring") from flooding the scored dict.
 
     Returns a list of (content, metadata_dict, score) tuples.
-    Exact matches score 1.0, fuzzy matches score 0.85.
+    Exact matches score 1.0, fuzzy matches score 0.5.
     File content is capped at 3000 characters to avoid flooding context.
     """
     MAX_CHARS = 3000
@@ -360,17 +423,20 @@ def _find_keyword_files(terms: list) -> list:
             fname_norm = re.sub(r"_[0-9a-f]{2}_?", " ", fname_norm)  # _XX_ → space
             fname_norm = fname_norm.replace("_", " ").replace("-", " ")
 
-            if all(w in fname_norm for w in term_words):
+            # Also accept a word without its trailing 's' to handle possessives
+            # typed without an apostrophe: "Mans" → try "Man" against "man s wharf".
+            if all(w in fname_norm or (w.endswith("s") and len(w) > 2 and w[:-1] in fname_norm)
+                   for w in term_words):
                 seen_paths.add(fpath)
                 with open(fpath, "r", encoding="utf-8", errors="replace") as f:
                     content = f.read(MAX_CHARS)
-                results.append((content, {"file_name": fname}, 0.85))
+                results.append((content, {"file_name": fname}, 0.5))
                 fuzzy_count += 1
 
     return results
 
 
-def retrieve_context(index, query: str, top_k: int = 6, raw_query: str = None) -> str:
+def retrieve_context(index, query: str, top_k: int = 10, raw_query: str = None) -> str:
     """
     Retrieve the most relevant wiki chunks for a query using hybrid search.
 
@@ -388,46 +454,53 @@ def retrieve_context(index, query: str, top_k: int = 6, raw_query: str = None) -
       3. Mechanic term map — injects pages for lowercase mechanics the embedding
          model can't bridge (die→Hollowing, hollow→Human_Effigy, covenant→Covenants, …).
       4. Merge all results keyed by filename, boosting pages found by multiple methods.
-      5. Return the top `top_k` (default 6) chunks formatted as context.
+      5. Return the top `top_k` (default 10) chunks formatted as context.
     """
     # Use raw_query for term extraction so player-stats labels don't pollute results
     term_query = raw_query if raw_query is not None else query
 
     # 1. Semantic search — use a large candidate pool (50) because ChromaDB's HNSW
     #    approximate search has poor recall at small k with this index size (~21k chunks).
-    #    The hybrid merge below still trims to top_k (default 6) at the end.
+    #    The hybrid merge below still trims to top_k (default 10) at the end.
+    #    Expand stat abbreviations (INT→Intelligence etc.) so the embedding model
+    #    can bridge short game-stat abbreviations to the full words in wiki text.
     retriever = index.as_retriever(similarity_top_k=50)
-    semantic_nodes = retriever.retrieve(query)
+    semantic_nodes = retriever.retrieve(_expand_stat_abbrevs(query))
 
-    # Deduplicate by filename, keeping the highest-scoring chunk per file
-    scored: dict = {}  # fname -> (text, metadata, score)
+    # Deduplicate by NORMALIZED filename so URL-encoded and plain variants of the
+    # same file (e.g. "No_Man_27s_Wharf.md" and "No_Man_s_Wharf.md") collapse into
+    # one slot instead of burning multiple top_k positions on identical content.
+    scored: dict = {}  # norm_fname -> (text, metadata, score)
     for node in semantic_nodes:
         fname = node.metadata.get("file_name", "unknown")
+        nkey = _norm_fname(fname)
         node_score = node.score or 0.0
-        if fname not in scored or node_score > scored[fname][2]:
-            scored[fname] = (node.text, node.metadata, node_score)
+        if nkey not in scored or node_score > scored[nkey][2]:
+            scored[nkey] = (node.text, node.metadata, node_score)
 
     # 2. Keyword/filename search (proper nouns — capitalized terms in raw question only)
     terms = extract_key_terms(term_query)
     if terms:
         for content, metadata, kw_score in _find_keyword_files(terms):
             fname = metadata.get("file_name", "unknown")
-            if fname in scored:
-                _prev_text, prev_meta, prev_score = scored[fname]
+            nkey = _norm_fname(fname)
+            if nkey in scored:
+                _prev_text, prev_meta, prev_score = scored[nkey]
                 # Prefer keyword content (top of file) over whatever chunk semantic
                 # search happened to return — avoids empty/irrelevant chunks winning.
-                scored[fname] = (content, prev_meta, prev_score + kw_score)
+                scored[nkey] = (content, prev_meta, prev_score + kw_score)
             else:
-                scored[fname] = (content, metadata, kw_score)
+                scored[nkey] = (content, metadata, kw_score)
 
     # 3. Mechanic term map (lowercase mechanics the embedding model can't bridge)
     for content, metadata, mech_score in _mechanic_search(term_query):
         fname = metadata.get("file_name", "unknown")
-        if fname in scored:
-            _prev_text, prev_meta, prev_score = scored[fname]
-            scored[fname] = (content, prev_meta, prev_score + mech_score)
+        nkey = _norm_fname(fname)
+        if nkey in scored:
+            _prev_text, prev_meta, prev_score = scored[nkey]
+            scored[nkey] = (content, prev_meta, prev_score + mech_score)
         else:
-            scored[fname] = (content, metadata, mech_score)
+            scored[nkey] = (content, metadata, mech_score)
 
     # 4. Sort by combined score descending, keep top_k
     sorted_results = sorted(scored.values(), key=lambda x: x[2], reverse=True)[:top_k]
