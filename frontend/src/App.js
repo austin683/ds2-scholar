@@ -3,6 +3,8 @@ import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8001';
+
 const SLASH_COMMANDS = [
   { cmd: '/level', desc: 'Open level-up stat allocator' },
 ];
@@ -148,9 +150,9 @@ function App() {
     setLoading(true);
 
     try {
-      const res = await axios.post('http://localhost:8001/soul-memory', {
+      const res = await axios.post(`${API_URL}/soul-memory`, {
         soul_memory: parseInt(sm, 10),
-      });
+      }, { headers: { 'ngrok-skip-browser-warning': 'true' } });
       const d = res.data;
       const tierRange = d.tier_range.replace(' - ', '–');
       const matchRange = d.matchmaking_range.replace(' - ', '–');
@@ -203,9 +205,9 @@ function App() {
     let lineBuffer = '';
 
     try {
-      const response = await fetch('http://localhost:8001/ask-stream', {
+      const response = await fetch(`${API_URL}/ask-stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         body: JSON.stringify({
           question,
           player_stats: buildPlayerStats(),
