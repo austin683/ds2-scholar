@@ -102,13 +102,53 @@ Question: {question}"""
     })
 
     response = claude.messages.create(
-        model="claude-opus-4-6",
+        model="claude-sonnet-4-6",
         max_tokens=1024,
         system=system_prompt,
         messages=messages
     )
 
     return response.content[0].text
+
+
+def stream_ask(index, question: str, chat_history: list = None):
+    """
+    Ask a question using RAG + Claude, streaming the response.
+    Yields text chunks as they arrive from the API.
+    """
+    context = retrieve_context(index, question)
+
+    system_prompt = """You are DS2 Scholar, an expert Dark Souls 2 companion AI.
+You have access to the complete Fextralife Dark Souls 2 wiki as your knowledge base.
+
+Your job is to give accurate, helpful answers about Dark Souls 2 based ONLY on the wiki context provided.
+If the context doesn't contain enough information to answer confidently, say so rather than guessing.
+
+When giving directions, always reference the nearest bonfire as a starting point.
+When giving build advice, consider the player's current stats and progression.
+Be concise but thorough. Use bullet points for lists of items or steps."""
+
+    messages = []
+
+    if chat_history:
+        messages.extend(chat_history)
+
+    messages.append({
+        "role": "user",
+        "content": f"""Wiki Context:
+{context}
+
+Question: {question}"""
+    })
+
+    with claude.messages.stream(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        system=system_prompt,
+        messages=messages
+    ) as stream:
+        for text in stream.text_stream:
+            yield text
 
 
 # Initialize index at module load time

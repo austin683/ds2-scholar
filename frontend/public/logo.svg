@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- No background — fully transparent canvas -->
+
+  <!-- ── FLAMES ── painted before the sword so the blade cuts through them -->
+
+  <!-- Outer left flame (dark amber, still visible on light/dark bg) -->
+  <path d="M34 82 C28 68 31 52 38 43
+           C34 54 36 66 41 72
+           C38 63 40 53 46 46
+           C43 59 41 71 47 78"
+        fill="#b04010" opacity="0.9"/>
+
+  <!-- Outer right flame -->
+  <path d="M66 82 C72 68 69 52 62 43
+           C66 54 64 66 59 72
+           C62 63 60 53 54 46
+           C57 59 59 71 53 78"
+        fill="#b04010" opacity="0.9"/>
+
+  <!-- Mid flame (rich amber) -->
+  <path d="M38 83 C33 70 35 56 42 48
+           C38 59 40 69 45 75
+           C42 66 44 57 50 52
+           C56 57 58 66 55 75
+           C60 69 62 59 58 48
+           C65 56 67 70 62 83"
+        fill="#d06820"/>
+
+  <!-- Inner flame (gold-amber) -->
+  <path d="M43 82 C39 70 41 59 47 53
+           C45 62 46 70 50 75
+           C54 70 55 62 53 53
+           C59 59 61 70 57 82Z"
+        fill="#e89020"/>
+
+  <!-- Bright core flame -->
+  <path d="M48 80 C46 70 46 62 50 57
+           C54 62 54 70 52 80Z"
+        fill="#f8c030"/>
+
+  <!-- Hot white-gold tip at the heart -->
+  <path d="M49.2 76 C48 68 48.5 63 50 60
+           C51.5 63 52 68 50.8 76Z"
+        fill="#fff5c0" opacity="0.85"/>
+
+  <!-- ── SWORD ── -->
+
+  <!-- Blade body (tapers from crossguard to tip) -->
+  <polygon points="50,11 48,15 47,56 53,56 52,15" fill="#c8981e"/>
+
+  <!-- Blade tip -->
+  <polygon points="50,9 47.5,15 52.5,15" fill="#c8981e"/>
+
+  <!-- Blade centre highlight -->
+  <polygon points="50,11 49.6,15 49.6,56 50.4,56 50.4,15 50,11"
+           fill="#fff5a0" opacity="0.30"/>
+
+  <!-- Crossguard -->
+  <rect x="34" y="55" width="32" height="5.5" rx="2.2" fill="#c8981e"/>
+  <!-- Crossguard bevel highlight -->
+  <rect x="34" y="55" width="32" height="2" rx="1.1" fill="#ffe880" opacity="0.30"/>
+
+  <!-- Grip / handle -->
+  <rect x="47.5" y="60.5" width="5" height="15" rx="1.8" fill="#8a5418"/>
+
+  <!-- Wrap lines on grip -->
+  <rect x="47.2" y="63.5" width="5.6" height="1.2" rx="0.6" fill="#4e2c08" opacity="0.6"/>
+  <rect x="47.2" y="66.8" width="5.6" height="1.2" rx="0.6" fill="#4e2c08" opacity="0.6"/>
+  <rect x="47.2" y="70.1" width="5.6" height="1.2" rx="0.6" fill="#4e2c08" opacity="0.6"/>
+
+  <!-- Pommel -->
+  <ellipse cx="50" cy="78.5" rx="5.5" ry="4.5" fill="#c8981e"/>
+  <!-- Pommel highlight -->
+  <ellipse cx="49" cy="77.2" rx="2.5" ry="1.5" fill="#ffe880" opacity="0.32"/>
+</svg>
