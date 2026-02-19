@@ -4,6 +4,7 @@
 
 import os
 import re
+import time
 from dotenv import load_dotenv
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
 from llama_index.vector_stores.chroma import ChromaVectorStore
@@ -20,6 +21,30 @@ DB_DIR = os.path.join(BASE_DIR, "db")
 
 # Anthropic client
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+# ─── TWO DATA-PATH ARCHITECTURE ──────────────────────────────────────────────
+# retrieve_context() uses two independent ways to read knowledge_base/ content:
+#
+#   PATH A — ChromaDB vector index (semantic search)
+#     • Built once by get_index() from the .md files, stored under db/.
+#     • NEVER reflects file edits made after the index was last built.
+#     • Must be rebuilt (scripts/rebuild_index.py) to pick up changes.
+#
+#   PATH B — raw .md file reads (_mechanic_search, _find_keyword_files)
+#     • Always reads the current file on disk; reflects edits immediately.
+#     • But only returns a window of FILE_READ_MAX_CHARS per file.
+#
+# Consequence: editing a .md file fixes PATH B instantly but PATH A stays
+# stale until the index is rebuilt. On startup we warn if stale files are
+# detected (see _check_index_freshness). Use scripts/rebuild_index.py to sync.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Maximum characters read from a single file in PATH B (keyword / mechanic search).
+# Section-aware truncation in _read_file_section keeps this from cutting mid-section.
+FILE_READ_MAX_CHARS = 8000
+
+# Timestamp file written when the index is freshly built; used for stale detection.
+INDEX_TIMESTAMP_FILE = os.path.join(DB_DIR, ".index_built_at")
 
 # Use a free local embedding model — no OpenAI needed
 EMBED_MODEL = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
@@ -82,6 +107,53 @@ def _expand_stat_abbrevs(text: str) -> str:
     return text
 
 
+def _check_index_freshness() -> None:
+    """
+    Warn at startup if any knowledge_base .md files were modified after the
+    ChromaDB index was last built.
+
+    Edits to .md files are immediately visible via PATH B (raw file reads in
+    _mechanic_search / _find_keyword_files) but are NOT reflected in PATH A
+    (semantic/vector search) until the index is rebuilt.  This function makes
+    that inconsistency visible rather than silent.
+
+    Run `python scripts/rebuild_index.py --changed` to sync only changed files,
+    or `python scripts/rebuild_index.py` for a full rebuild.
+    """
+    if not os.path.exists(INDEX_TIMESTAMP_FILE):
+        return  # index was built before timestamp tracking was added; can't determine age
+
+    try:
+        index_built_at = float(open(INDEX_TIMESTAMP_FILE).read().strip())
+    except (ValueError, OSError):
+        return
+
+    stale: list = []
+    for fname in os.listdir(KNOWLEDGE_BASE_DIR):
+        if not fname.endswith(".md"):
+            continue
+        fpath = os.path.join(KNOWLEDGE_BASE_DIR, fname)
+        if os.path.getmtime(fpath) > index_built_at:
+            stale.append(fname)
+
+    if stale:
+        print(
+            f"\n[WARNING] INDEX STALE: {len(stale)} knowledge_base file(s) modified "
+            f"after the ChromaDB index was last built."
+        )
+        print(
+            "  PATH B (keyword/mechanic raw reads) already sees these changes.\n"
+            "  PATH A (semantic search) does NOT — rebuild to sync:\n"
+            "    python scripts/rebuild_index.py --changed"
+        )
+        shown = stale[:5]
+        for f in shown:
+            print(f"    - {f}")
+        if len(stale) > 5:
+            print(f"    ... and {len(stale) - 5} more.")
+        print()
+
+
 def get_index():
     """Load existing index from ChromaDB or build it from knowledge base."""
     chroma_client = chromadb.PersistentClient(path=DB_DIR)
@@ -97,6 +169,7 @@ def get_index():
             storage_context=storage_context,
             embed_model=EMBED_MODEL
         )
+        _check_index_freshness()
     else:
         # Build index from scratch
         print("Building index from knowledge base... this may take a few minutes.")
@@ -110,6 +183,9 @@ def get_index():
             show_progress=True
         )
         print("Index built and saved to db/")
+        # Record build timestamp so future startups can detect stale files.
+        with open(INDEX_TIMESTAMP_FILE, "w") as f:
+            f.write(str(time.time()))
 
     return index
 
@@ -337,6 +413,61 @@ MECHANIC_TERM_MAP: dict = {
 }
 
 
+def _read_file_section(fpath: str, hint_words: list, max_chars: int = FILE_READ_MAX_CHARS) -> str:
+    """
+    Read up to max_chars from a wiki file, starting from the section most
+    relevant to hint_words rather than always from the top of the file.
+
+    Algorithm:
+    1. Read the whole file. If it fits within max_chars, return it whole.
+    2. Otherwise, score every markdown heading (# / ## / ### / ####) by how
+       many hint_words appear in the heading text. Start extraction from the
+       highest-scoring heading (falls back to position 0 if no heading matches).
+    3. Take content[start : start + max_chars].  Then cut cleanly at the last
+       section heading that falls in the second half of that window — so the
+       served chunk always ends at a natural section boundary rather than mid-
+       sentence.
+
+    This prevents the 3 000-char limit from serving only button-control tables
+    for a query about Poise when the Poise section sits at char 12 000 of
+    Combat.md, for example.
+    """
+    with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+        content = f.read()
+
+    if len(content) <= max_chars:
+        return content
+
+    hint_set = {w.lower() for w in hint_words if len(w) > 2}
+    heading_re = re.compile(r"^#{1,4}\s+(.+)$", re.MULTILINE)
+    headings = list(heading_re.finditer(content))
+
+    # Find the heading whose text best matches hint_words
+    start = 0
+    if hint_set:
+        best_score = 0
+        for m in headings:
+            score = sum(1 for w in hint_set if w in m.group(1).lower())
+            if score > best_score:
+                best_score = score
+                start = m.start()
+
+    chunk = content[start: start + max_chars]
+
+    # Trim to the last section heading that falls past the midpoint of the chunk
+    # so we don't serve a half-finished section at the tail.
+    if len(chunk) == max_chars:
+        midpoint = max_chars // 2
+        last_heading_pos = None
+        for m in re.finditer(r"^#{1,4}\s+", chunk, re.MULTILINE):
+            if m.start() > midpoint:
+                last_heading_pos = m.start()
+        if last_heading_pos:
+            chunk = chunk[:last_heading_pos]
+
+    return chunk
+
+
 def _mechanic_search(query: str) -> list:
     """
     Check the query against MECHANIC_TERM_MAP using word-boundary matching.
@@ -347,8 +478,11 @@ def _mechanic_search(query: str) -> list:
     retrieve_context can always apply the score boost even for pages the
     semantic search already found (previously a bug where low-scoring
     semantic hits blocked the mechanic boost entirely).
+
+    Uses _read_file_section with the matched trigger words as hints so that
+    long mechanic pages (e.g. Combat.md at 35 k chars) start extraction at
+    the relevant heading rather than always from the top of the file.
     """
-    MAX_CHARS = 3000
     query_lower = query.lower()
     files_to_add: list = []
     added_fnames: set = set()
@@ -364,12 +498,13 @@ def _mechanic_search(query: str) -> list:
                     os.path.join(KNOWLEDGE_BASE_DIR, fname)
                 ):
                     added_fnames.add(fname)
-                    files_to_add.append((os.path.join(KNOWLEDGE_BASE_DIR, fname), fname))
+                    # Store trigger alongside path so we can use it as a hint
+                    # for section-aware extraction in long files.
+                    files_to_add.append((os.path.join(KNOWLEDGE_BASE_DIR, fname), fname, trigger))
 
     results = []
-    for fpath, fname in files_to_add:
-        with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-            content = f.read(MAX_CHARS)
+    for fpath, fname, trigger in files_to_add:
+        content = _read_file_section(fpath, trigger.split())
         results.append((content, {"file_name": fname}, 0.9))
     return results
 
@@ -387,22 +522,24 @@ def _find_keyword_files(terms: list) -> list:
 
     Returns a list of (content, metadata_dict, score) tuples.
     Exact matches score 1.0, fuzzy matches score 0.5.
-    File content is capped at 3000 characters to avoid flooding context.
+    File content is extracted via _read_file_section (section-aware, up to
+    FILE_READ_MAX_CHARS chars) so that long area/mechanic pages don't serve
+    only a header block when the relevant content is deeper in the file.
     """
-    MAX_CHARS = 3000
     MAX_FUZZY_PER_TERM = 5
     results = []
     seen_paths: set = set()
     filenames = _get_kb_filenames()
 
     for term in terms:
+        hint_words = term.split()
+
         # --- Exact filename match ---
         candidate = term.replace(" ", "_") + ".md"
         exact_path = os.path.join(KNOWLEDGE_BASE_DIR, candidate)
         if os.path.exists(exact_path) and exact_path not in seen_paths:
             seen_paths.add(exact_path)
-            with open(exact_path, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read(MAX_CHARS)
+            content = _read_file_section(exact_path, hint_words)
             results.append((content, {"file_name": candidate}, 1.0))
             continue  # exact hit — no need to fuzzy-search for this term
 
@@ -428,8 +565,7 @@ def _find_keyword_files(terms: list) -> list:
             if all(w in fname_norm or (w.endswith("s") and len(w) > 2 and w[:-1] in fname_norm)
                    for w in term_words):
                 seen_paths.add(fpath)
-                with open(fpath, "r", encoding="utf-8", errors="replace") as f:
-                    content = f.read(MAX_CHARS)
+                content = _read_file_section(fpath, hint_words)
                 results.append((content, {"file_name": fname}, 0.5))
                 fuzzy_count += 1
 
