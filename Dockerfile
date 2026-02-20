@@ -13,8 +13,10 @@ RUN python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-smal
 COPY backend/ ./backend/
 COPY knowledge_base/ ./knowledge_base/
 
-# db/ is intentionally NOT copied — Railway mounts a persistent volume here
-# On first boot, get_index() will build it from knowledge_base/ automatically
+# Bake the pre-built ChromaDB index into the image as db_baked/.
+# On startup, get_index() copies db_baked/ → db/ if the volume is empty or
+# has an incompatible schema, avoiding an 8-hour runtime rebuild.
+COPY db/ ./db_baked/
 
 ENV PYTHONPATH=/app
 

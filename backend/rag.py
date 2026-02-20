@@ -21,6 +21,7 @@ load_dotenv()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KNOWLEDGE_BASE_DIR = os.path.join(BASE_DIR, "knowledge_base")
 DB_DIR = os.path.join(BASE_DIR, "db")
+DB_BAKED_DIR = os.path.join(BASE_DIR, "db_baked")  # pre-built index baked into Docker image
 
 # Anthropic client
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
@@ -189,18 +190,31 @@ def _check_index_freshness() -> None:
         print()
 
 
+def _restore_baked_index():
+    """Copy the pre-built index from db_baked/ into db/. Much faster than rebuilding."""
+    if not os.path.isdir(DB_BAKED_DIR):
+        return False
+    print("Restoring pre-built index from db_baked/ (this takes seconds, not hours)...")
+    shutil.rmtree(DB_DIR, ignore_errors=True)
+    shutil.copytree(DB_BAKED_DIR, DB_DIR)
+    print("Index restored from db_baked/")
+    return True
+
+
 def get_index():
     """Load existing index from ChromaDB or build it from knowledge base."""
+    def _open_collection():
+        client = chromadb.PersistentClient(path=DB_DIR)
+        return client, client.get_or_create_collection("ds2_scholar")
+
     try:
-        chroma_client = chromadb.PersistentClient(path=DB_DIR)
-        chroma_collection = chroma_client.get_or_create_collection("ds2_scholar")
+        chroma_client, chroma_collection = _open_collection()
     except Exception as e:
         if "no such column" in str(e) or "OperationalError" in type(e).__name__:
-            print(f"ChromaDB schema mismatch detected ({e}). Wiping stale db and rebuilding...")
-            shutil.rmtree(DB_DIR, ignore_errors=True)
-            os.makedirs(DB_DIR, exist_ok=True)
-            chroma_client = chromadb.PersistentClient(path=DB_DIR)
-            chroma_collection = chroma_client.get_or_create_collection("ds2_scholar")
+            print(f"ChromaDB schema mismatch ({e}). Attempting restore from db_baked/...")
+            if not _restore_baked_index():
+                print("No db_baked/ found — falling back to full rebuild (may take a long time).")
+            chroma_client, chroma_collection = _open_collection()
         else:
             raise
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
@@ -216,21 +230,30 @@ def get_index():
         )
         _check_index_freshness()
     else:
-        # Build index from scratch
-        print("Building index from knowledge base... this may take a few minutes.")
-        documents = SimpleDirectoryReader(KNOWLEDGE_BASE_DIR).load_data()
-        print(f"Loaded {len(documents)} documents.")
-        storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        index = VectorStoreIndex.from_documents(
-            documents,
-            storage_context=storage_context,
-            embed_model=EMBED_MODEL,
-            show_progress=True
-        )
-        print("Index built and saved to db/")
-        # Record build timestamp so future startups can detect stale files.
-        with open(INDEX_TIMESTAMP_FILE, "w") as f:
-            f.write(str(time.time()))
+        # db/ is empty — try baked snapshot first, then fall back to full rebuild
+        if _restore_baked_index():
+            chroma_client, chroma_collection = _open_collection()
+            vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+            storage_context = StorageContext.from_defaults(vector_store=vector_store)
+            index = VectorStoreIndex.from_vector_store(
+                vector_store,
+                storage_context=storage_context,
+                embed_model=EMBED_MODEL
+            )
+        else:
+            print("Building index from knowledge base... this may take a long time.")
+            documents = SimpleDirectoryReader(KNOWLEDGE_BASE_DIR).load_data()
+            print(f"Loaded {len(documents)} documents.")
+            storage_context = StorageContext.from_defaults(vector_store=vector_store)
+            index = VectorStoreIndex.from_documents(
+                documents,
+                storage_context=storage_context,
+                embed_model=EMBED_MODEL,
+                show_progress=True
+            )
+            print("Index built and saved to db/")
+            with open(INDEX_TIMESTAMP_FILE, "w") as f:
+                f.write(str(time.time()))
 
     return index
 
