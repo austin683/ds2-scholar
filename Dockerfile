@@ -14,9 +14,11 @@ COPY backend/ ./backend/
 COPY knowledge_base/ ./knowledge_base/
 
 # Bake the pre-built ChromaDB index into the image as db_baked/.
+# chroma.sqlite3 is stored compressed (.gz) to stay under GitHub's 100MB limit.
 # On startup, get_index() copies db_baked/ → db/ if the volume is empty or
 # has an incompatible schema, avoiding an 8-hour runtime rebuild.
 COPY db/ ./db_baked/
+RUN gunzip /app/db_baked/chroma.sqlite3.gz
 
 ENV PYTHONPATH=/app
 
