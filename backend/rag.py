@@ -4,6 +4,7 @@
 
 import os
 import re
+import shutil
 import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
@@ -190,8 +191,18 @@ def _check_index_freshness() -> None:
 
 def get_index():
     """Load existing index from ChromaDB or build it from knowledge base."""
-    chroma_client = chromadb.PersistentClient(path=DB_DIR)
-    chroma_collection = chroma_client.get_or_create_collection("ds2_scholar")
+    try:
+        chroma_client = chromadb.PersistentClient(path=DB_DIR)
+        chroma_collection = chroma_client.get_or_create_collection("ds2_scholar")
+    except Exception as e:
+        if "no such column" in str(e) or "OperationalError" in type(e).__name__:
+            print(f"ChromaDB schema mismatch detected ({e}). Wiping stale db and rebuilding...")
+            shutil.rmtree(DB_DIR, ignore_errors=True)
+            os.makedirs(DB_DIR, exist_ok=True)
+            chroma_client = chromadb.PersistentClient(path=DB_DIR)
+            chroma_collection = chroma_client.get_or_create_collection("ds2_scholar")
+        else:
+            raise
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
 
     # If the collection already has data, load it directly
