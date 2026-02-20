@@ -1,0 +1,10 @@
+frontend/
+db/
+.env
+.git/
+__pycache__/
+*.pyc
+.DS_Store
+scraper/
+tests/
+scripts/

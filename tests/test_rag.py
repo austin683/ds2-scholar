@@ -311,3 +311,124 @@ class TestMechanicSearch:
         results = rag._mechanic_search("where is mcduff's workshop key")
         fnames = [m["file_name"] for _, m, _ in results]
         assert "Bastille_Key.md" in fnames
+
+    # ── Cheese / GENERIC_TRIGGERS tests ──────────────────────────────────────
+
+    def test_cheese_trigger_injects_pursuer(self):
+        results = rag._mechanic_search("what bosses can be cheesed")
+        fnames = [m["file_name"] for _, m, _ in results]
+        assert "The_Pursuer.md" in fnames
+
+    def test_cheese_trigger_injects_dragonrider(self):
+        results = rag._mechanic_search("what bosses can be cheesed")
+        fnames = [m["file_name"] for _, m, _ in results]
+        assert "Dragonrider.md" in fnames
+
+    def test_cheese_trigger_injects_all_six(self):
+        """All six cheese-map pages should be returned for a broad cheese query."""
+        expected = {
+            "The_Pursuer.md", "Dragonrider.md", "The_Last_Giant.md",
+            "The_Rotten.md", "Ancient_Dragon.md", "Mytha_the_Baneful_Queen.md",
+        }
+        results = rag._mechanic_search("what bosses can be cheesed")
+        fnames = {m["file_name"] for _, m, _ in results}
+        assert expected.issubset(fnames)
+
+    def test_cheesed_variant_fires(self):
+        """'cheesed' form triggers the same pages as 'cheese'."""
+        results = rag._mechanic_search("which bosses get cheesed easily")
+        fnames = {m["file_name"] for _, m, _ in results}
+        assert "The_Pursuer.md" in fnames
+
+    def test_cheeseable_variant_fires(self):
+        results = rag._mechanic_search("what bosses are cheeseable")
+        fnames = {m["file_name"] for _, m, _ in results}
+        assert "Dragonrider.md" in fnames
+
+    def test_cheeses_plural_fires_cheese_trigger(self):
+        """'cheeses' (plural) should still match the 'cheese' trigger via s? suffix."""
+        results = rag._mechanic_search("list all the cheeses in the game")
+        fnames = {m["file_name"] for _, m, _ in results}
+        assert "The_Pursuer.md" in fnames
+
+    def test_cheesing_fires_cheese_trigger(self):
+        """'cheesing' should trigger the cheese entries (requires 'cheesing' in the map)."""
+        results = rag._mechanic_search("tips for cheesing the pursuer")
+        fnames = {m["file_name"] for _, m, _ in results}
+        assert "The_Pursuer.md" in fnames
+
+    def test_suppress_generic_true_blocks_cheese_list(self):
+        """When suppress_generic=True, cheese entries should NOT be injected."""
+        results = rag._mechanic_search(
+            "does the smelter demon have a cheese", suppress_generic=True
+        )
+        fnames = {m["file_name"] for _, m, _ in results}
+        cheese_pages = {
+            "The_Pursuer.md", "Dragonrider.md", "The_Last_Giant.md",
+            "The_Rotten.md", "Ancient_Dragon.md", "Mytha_the_Baneful_Queen.md",
+        }
+        assert fnames.isdisjoint(cheese_pages), (
+            f"Cheese pages leaked through suppress_generic: {fnames & cheese_pages}"
+        )
+
+    def test_suppress_generic_false_keeps_cheese_list(self):
+        """suppress_generic=False (default) should still inject cheese pages."""
+        results = rag._mechanic_search(
+            "what bosses can be cheesed", suppress_generic=False
+        )
+        fnames = {m["file_name"] for _, m, _ in results}
+        assert "The_Pursuer.md" in fnames
+
+    def test_suppress_generic_does_not_block_non_generic_triggers(self):
+        """Non-generic triggers (e.g. gavlan) must still fire even when suppress=True."""
+        results = rag._mechanic_search(
+            "where is gavlan and does he have a cheese", suppress_generic=True
+        )
+        fnames = {m["file_name"] for _, m, _ in results}
+        # gavlan is not in GENERIC_TRIGGERS — should still be injected
+        assert "Gavlan.md" in fnames or "Lonesome_Gavlan.md" in fnames
+        # cheese list should be suppressed
+        assert "The_Pursuer.md" not in fnames
+
+    def test_generic_triggers_set_contents(self):
+        """GENERIC_TRIGGERS must include all cheese/aggregation trigger words."""
+        required = {"cheese", "cheesed", "cheeseable", "cheesing", "easy boss"}
+        assert required.issubset(rag.GENERIC_TRIGGERS)
+
+    def test_mechanic_hint_overrides_has_cheese(self):
+        """MECHANIC_HINT_OVERRIDES must have strategy-level hints for cheese triggers."""
+        for trigger in ("cheese", "cheesed", "cheeseable"):
+            assert trigger in rag.MECHANIC_HINT_OVERRIDES
+            hints = rag.MECHANIC_HINT_OVERRIDES[trigger]
+            assert "strategy" in hints or "tips" in hints or "hints" in hints
+
+
+# ─────────────────────────────────────────────────────────────
+# extract_key_terms — cheese/suppress interaction helpers
+# ─────────────────────────────────────────────────────────────
+
+class TestExtractKeyTermsCheeseQueries:
+
+    def test_broad_cheese_query_returns_no_title_case_terms(self):
+        """'what bosses can be cheesed' has no proper nouns → terms=[] → suppress=False."""
+        terms = rag.extract_key_terms("what bosses can be cheesed")
+        # Should produce lowercase fallback terms only (no Title-Case)
+        title_case_terms = [t for t in terms if t[0].isupper()]
+        assert title_case_terms == []
+
+    def test_specific_boss_cheese_query_returns_boss_term(self):
+        """'Does the Dragonrider have a cheese' → 'Dragonrider' extracted → suppress=True."""
+        terms = rag.extract_key_terms("Does the Dragonrider have a cheese")
+        assert any("Dragonrider" in t for t in terms)
+
+    def test_specific_boss_cheese_query_lowercase_still_has_terms(self):
+        """All-lowercase boss+cheese query still produces terms (via fallback) → suppress=True."""
+        terms = rag.extract_key_terms("can i cheese the smelter demon")
+        # lowercase fallback: "smelter", "demon", "cheese" extracted as singles/bigrams
+        assert len(terms) > 0  # non-empty → suppress_generic=True in retrieve_context
+
+    def test_cheesing_gerund_lowercase_fallback(self):
+        """'cheesing' should appear in fallback terms so the caller knows a cheese query."""
+        terms = rag.extract_key_terms("tips for cheesing the ancient dragon")
+        term_strs = " ".join(terms)
+        assert "cheesing" in term_strs or "ancient" in term_strs

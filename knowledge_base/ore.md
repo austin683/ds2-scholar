@@ -1,0 +1,24 @@
+# Source: https://darksouls2.wiki.fextralife.com/ore
+
+Please visit our [Titanite Farming](/Titanite+Farming "Dark Souls 2 Titanite Farming") page for ideas on where to obtain Ore and [Upgrades](/Upgrades "Dark Souls 2 Upgrades") for the effects of applying ore to equipment.
+    
+    
+    | Icon | Item Name | Usage | How to Obtain it |
+    | --- | --- | --- | --- |
+    |  | Titanite Shard | Reinforce standard equipment up to +3 (6 needed) | Sold by the Blacksmith Lenigrast in Majula , only 10 pieces for 800 souls each. Unlimited supply sold by Stone Trader Chloanne after progressing through game farther. |
+    |  | Large Titanite Shard | Reinforce standard equipment up to +6 (6 needed) | Unlimited supply sold by the Stone Trader Chloanne after all 4 Greater Souls are Embraced. Unlimited supply sold by Blacksmith McDuff in the Lost Bastille . Drops from villagers in the Brightstone Cove , Old Ironclads in Forest of Fallen Giants , Coal Tar in Black Gulch , Ironclad soldiers in Ironkeep , Gyrm (ones in Blue) in Doors of Pharros, the Giant Basilisk in the Huntsman's Copse and etc. |
+    |  | Titanite Chunk | Reinforce standard equipment up to +9 (6 needed) | Unlimited supply sold by the Stone Trader Chloanne after Nashandra is defeated. Dropped by Coal Tar in Black Gulch , Gyrm Warriors (both Axe and Hammer variants) in Doors of Pharros and etc. When member of Bell Tower Covenant, acquired after each successful defeat. |
+    |  | Titanite Slab | Reinforce standard equipment up to +10 (1 needed) | 1 sold by Stone Trader Chloanne . Drops from the Stone Soldier (both Twinblade and Spear variants) in Drangleic Castle . (Infinite spawing and drop at the King's Gate area One in Forest of Fallen Giants , in the basement of the room with the ballistas trap, after using a Pharros Lockstone . Trading Small Sm ooth & Silky stones , Smooth & Silky stones , or Petrified Something with Dyna and Tillo 1 given by McDuff after shopping and imbuing (uncertain exacly how much) 1 drops after defeating the Prowling Magus and Congregation boss in Brightstone Cove Tseldora - Royal Army Campsite |
+    |  | Twinkling Titanite | Reinforce what cannot normally be reinforced to +5 (15 needed) | Dropped by the Crystal Lizards . 3 sold by Stone Trader Chloanne . Dropped by Archdrake Knights and Sorceresses in The Shrine of Amana. 2 can be obtained close to the " The Place Uneknownst " bonfire in The Forest of Fallen Giants . This is useful, as the memory of giants provides a bonfire ascetic, allowing for an infinite amount of twinkling titanite. |
+    |  | Raw Stone | Changes weapon class to Raw. | 3 sold by Stone Trader Chloanne Dropped by Basilisks 1 found in chest in Harvest Valley. In the cave next to the first Dark Magic Giant. |
+    |  | Faintstone | Imbues weapons with magic or provide magic reduction to shields. | 3 sold Stone Trader Chloanne Rare drop from Basilisks Rare drop from the ghosts in the Undead Crypt |
+    |  | Firedrake Stone | Imbues weapons with fire or provide fire reduction to shields. | 3 sold by Stone Trader Chloanne Dropped by the Basilisks in Brightstone Cove Tseldora , Ironclad soldiers in Ironkeep |
+    |  | Boltstone | Imbues weapons with lightning or provide lightning reduction to shields. | 3 sold Stone Trader Chloanne / Unlimited sold by Blue Sentinel Targray Rare drop from Basilisks |
+    |  | Darknight Stone | Imbues weapons with dark or provide dark reduction to shields. | 3 sold Stone Trader Chloanne / Rare drop from Basilisks / Rare drop from the ghosts in the Undead Crypt |
+    |  | Poison Stone | Imbues weapons with poison or provide poison reduction to shields. | 3 sold by Stone Trader Chloanne 2 Found outside the entrance to Mytha, the Baneful Queen 's room Rare drop from Basilisks |
+    |  | Bleed Stone | Imbues weapons with bleed or provide bleed reduction to shields. | 3 sold by Stone Trader Chloanne 1 found on corpse in Grave of Saints. After Royal Rat Vanguard Boss Fight. 1 found in a illusory wall in Sinner's Rise Dropped by Lizardmen in Shrine of Amana and Basilisks |
+    |  | Magic Stone | Causes physical damage to scale with Intelligence | 3 sold by Stone Trader Chloanne Dropped by the Fire Mages in Earthen Peak Dropped by Gyrm Warrior (Hammer, Axe not confirmed) in Doors of Pharros - rare |
+    |  | Old Mundane Stone | Grants the power of the mundane to weapon | Dropped by Gyrm Warriors in Doors of Pharros |
+    |  | Palestone | Undo the upgrade path you choose but keeps the weapon reinforcement lvl | Dropped by Old Knights in Heide's Tower of Flame Dropped by Basilisks . |
+    |  | Petrified Dragon Bone | Reinforces special equipment to +5 (15 needed) | Occasionally dropped by Crystal Lizards . Found throughout the world. Dropped by Dragon Acolyte in Aldia's Keep. Dropped by the Optional Boss Ancient Dragon. |
+    |  | Fire Seed | Upgrades Pyromancy Flames up to +10 | Found throughout the world 3 sold by Rosabeth of Melfia |

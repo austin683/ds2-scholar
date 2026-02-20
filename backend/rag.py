@@ -410,7 +410,41 @@ MECHANIC_TERM_MAP: dict = {
     "rosabeth":            ["Rosabeth_of_Melfia.md"],
     "gavlan":              ["Gavlan.md", "Lonesome_Gavlan.md"],
     "lonesome gavlan":     ["Gavlan.md"],
+    # Boss cheese / exploit strategies — "cheese" is gaming slang not used consistently in
+    # wiki pages; boss pages describe exploits without that word (ballista, fall off, bow trick).
+    # Inject the most notable cheese-friendly boss pages so the model can answer aggregation
+    # queries like "what bosses can be cheesed" from actual wiki strategy sections.
+    "cheese":     ["The_Pursuer.md", "Dragonrider.md", "The_Last_Giant.md",
+                   "The_Rotten.md", "Ancient_Dragon.md", "Mytha_the_Baneful_Queen.md"],
+    "cheesed":    ["The_Pursuer.md", "Dragonrider.md", "The_Last_Giant.md",
+                   "The_Rotten.md", "Ancient_Dragon.md", "Mytha_the_Baneful_Queen.md"],
+    "cheeseable": ["The_Pursuer.md", "Dragonrider.md", "The_Last_Giant.md",
+                   "The_Rotten.md", "Ancient_Dragon.md", "Mytha_the_Baneful_Queen.md"],
+    "cheesing":   ["The_Pursuer.md", "Dragonrider.md", "The_Last_Giant.md",
+                   "The_Rotten.md", "Ancient_Dragon.md", "Mytha_the_Baneful_Queen.md"],
+    "easy boss":  ["The_Pursuer.md", "Dragonrider.md", "The_Last_Giant.md"],
 }
+
+
+# Per-trigger hint-word overrides for _mechanic_search.
+# When a trigger's own words are useless for heading-matching (e.g. "cheese" → no boss
+# page has a heading called "Cheese"), supply better hint words so _read_file_section
+# starts extraction at the relevant section (Strategy, Tips, Notes) rather than
+# always from position 0 of the file.
+MECHANIC_HINT_OVERRIDES: dict = {
+    "cheese":     ["strategy", "tips", "notes", "exploit", "hints"],
+    "cheesed":    ["strategy", "tips", "notes", "exploit", "hints"],
+    "cheeseable": ["strategy", "tips", "notes", "exploit", "hints"],
+    "cheesing":   ["strategy", "tips", "notes", "exploit", "hints"],
+    "easy boss":  ["strategy", "tips", "hints"],
+}
+
+# Triggers whose injected page lists are "aggregation" answers — useful for broad questions
+# ("what bosses can be cheesed?") but add noise when the query also names a specific entity
+# ("does the Smelter Demon have a cheese?"). When a proper noun is detected alongside one of
+# these triggers, keyword + semantic search handles the specific entity instead, and the
+# generic list is suppressed so unrelated pages don't flood the top_k slots.
+GENERIC_TRIGGERS: set = {"cheese", "cheesed", "cheeseable", "cheesing", "easy boss"}
 
 
 def _read_file_section(fpath: str, hint_words: list, max_chars: int = FILE_READ_MAX_CHARS) -> str:
@@ -468,7 +502,7 @@ def _read_file_section(fpath: str, hint_words: list, max_chars: int = FILE_READ_
     return chunk
 
 
-def _mechanic_search(query: str) -> list:
+def _mechanic_search(query: str, suppress_generic: bool = False) -> list:
     """
     Check the query against MECHANIC_TERM_MAP using word-boundary matching.
     Returns (content, metadata, score) tuples for ALL matched pages.
@@ -493,6 +527,8 @@ def _mechanic_search(query: str) -> list:
         # "gavlans" matches "gavlan", etc. (handles possessives without apostrophe).
         pattern = r"\b" + re.escape(trigger) + r"s?\b"
         if re.search(pattern, query_lower):
+            if suppress_generic and trigger in GENERIC_TRIGGERS:
+                continue
             for fname in fnames:
                 if fname not in added_fnames and os.path.exists(
                     os.path.join(KNOWLEDGE_BASE_DIR, fname)
@@ -504,7 +540,10 @@ def _mechanic_search(query: str) -> list:
 
     results = []
     for fpath, fname, trigger in files_to_add:
-        content = _read_file_section(fpath, trigger.split())
+        # Use per-trigger hint overrides when the trigger word itself won't match
+        # any heading in the target file (e.g. "cheese" → use "strategy"/"tips").
+        hint_words = MECHANIC_HINT_OVERRIDES.get(trigger, trigger.split())
+        content = _read_file_section(fpath, hint_words)
         results.append((content, {"file_name": fname}, 0.9))
     return results
 
@@ -628,8 +667,11 @@ def retrieve_context(index, query: str, top_k: int = 10, raw_query: str = None) 
             else:
                 scored[nkey] = (content, metadata, kw_score)
 
-    # 3. Mechanic term map (lowercase mechanics the embedding model can't bridge)
-    for content, metadata, mech_score in _mechanic_search(term_query):
+    # 3. Mechanic term map (lowercase mechanics the embedding model can't bridge).
+    #    If a specific named entity was already found via keyword search (terms is non-empty),
+    #    suppress generic aggregation triggers (cheese, easy boss) so their broad page lists
+    #    don't crowd out the specific boss/NPC page the user is actually asking about.
+    for content, metadata, mech_score in _mechanic_search(term_query, suppress_generic=bool(terms)):
         fname = metadata.get("file_name", "unknown")
         nkey = _norm_fname(fname)
         if nkey in scored:

@@ -301,9 +301,9 @@ function App() {
           </div>
 
           {/* Grid + button — flow from just below title, space absorbs at bottom */}
-          <div className="absolute top-[72px] bottom-0 left-0 right-0 flex flex-col overflow-y-auto px-7">
+          <div className="absolute top-[72px] bottom-0 left-0 right-0 flex flex-col overflow-hidden px-7">
           <div
-            className="pt-3 pb-2 grid gap-x-3 gap-y-2 w-full flex-none"
+            className="pt-2 pb-2 grid gap-x-3 gap-y-2 w-full flex-none"
             style={{ gridTemplateColumns: '6rem 1fr', gridTemplateRows: 'repeat(9, auto)', alignItems: 'stretch' }}
           >
 
@@ -366,7 +366,7 @@ function App() {
           </div>{/* end grid */}
 
           {/* Clear Stats — immediately below grid */}
-          <div className="pt-6 pb-5 flex-none">
+          <div className="pt-4 pb-5 flex-none">
             <button
               onClick={handleClearStats}
               className="w-full bg-yellow-600 hover:bg-yellow-500 active:bg-yellow-700 text-neutral-900 font-semibold text-xs rounded-md py-2 transition-colors"
@@ -655,7 +655,7 @@ function App() {
                 /* Step 2 — distribute levels */
                 <>
                   {/* Soul level + remaining counter */}
-                  <div className="text-center mt-1 mb- space-y-1.5">
+                  <div className="text-center mt-1 mb-5 space-y-1.5">
                     <p className="text-neutral-400 text-base">
                       Soul Level:&nbsp;
                       <span className="text-neutral-200">{currentSL || '—'}</span>

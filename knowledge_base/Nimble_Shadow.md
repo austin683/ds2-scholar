@@ -1,0 +1,52 @@
+# Source: https://darksouls2.wiki.fextralife.com/Nimble+Shadow
+
+| Nimble Shadow (Suspicious Shadows) | Nimble Shadow (Suspicious Shadows) |
+    | --- | --- |
+    |  |  |
+    | HP | NG: 330 / NG+: 670 / NG+7: 1,250 |
+    | Weakness | Magic / Lightning |
+    | Resistance | Fire |
+    | Respawns | Yes |
+    
+
+**Nimble Shadow** (Suspicious Shadows) is an [enemy](/enemies "Dark Souls 2 enemies") in [Dark Souls 2](/Dark+Souls+2+Wiki "Dark Souls 2 Wiki")**(DKS2)**. **Nimble Shadow** , highly skilled assassins frequently employed as bodyguards. [Enemies](/Enemies "Dark Souls 2 Enemies") have their own behavior and unique attacks, killing enemies provide various drops that reward players with items and souls.
+
+### Dark Souls 2 Nimble Shadow (Suspicious Shadows) Information
+
+_"Those who are especially adept assassins are often hired as bodyguards. In an attempt to stave off the curse,King Vendrick hired shadowmen to put down the Hollows, but before long they were Hollowed themselves.__"_
+
+_In[New Game Plus](/New+Game+Plus "Dark Souls 2 New Game Plus"), two additional dark spirit minions that aid the [No Man's Wharf](/No+Man%27s+Wharf "Dark Souls 2 No Man%27s Wharf") [Flexile Sentry](/Flexile+Sentry "Dark Souls 2 Flexile Sentry") during the boss battle._
+
+### Nimble Shadow (Suspicious Shadows) Location in Dark Souls 2
+
+  * [No-man's Wharf](/No-man%27s+Wharf "Dark Souls 2 No-man%27s Wharf")
+  * [Lost Bastille](/Lost+Bastille "Dark Souls 2 Lost Bastille")
+  * [Earthen Peak](/Earthen+Peak "Dark Souls 2 Earthen Peak")
+
+### Dark Souls 2 Nimble Shadow (Suspicious Shadows) Drops
+
+  * [Shadow Set](/Shadow+Set "Dark Souls 2 Shadow Set")
+  * [Malformed Claws](/Malformed+Claws "Dark Souls 2 Malformed Claws")
+  * [Shadow Dagger](/Shadow+Dagger "Dark Souls 2 Shadow Dagger")
+  * NG: 350 Souls,NG+ 700 Souls, NG+7: 1,400 Souls.
+
+### DKS2 Nimble Shadow (Suspicious Shadows) Strategy Tips
+
+  * \--
+
+### Nimble Shadow (Suspicious Shadows) Move Set in DKS2
+
+  * Claws and Projectiles. 
+    * Inflicts Bleed and Poison
+    * Physical Damage
+    * Can be blocked
+
+### Dark Souls 2 Nimble Shadow (Suspicious Shadows) Notes and Tips
+
+  * Notes and Tips go here.
+
+    
+    
+    | Enemies |
+    | --- |
+    | Abandoned Hollow ♦ Aldia Warlock ♦ Alonne Knight ♦ Alonne Knight Captain ♦ Amana Aberration ♦ Amana Priestess ♦ Archdrake Pilgrim ♦ Armored Skeleton ♦ Armorer Dennis ♦ Ashen Crawler ♦ Ashen Idol ♦ Ashen Warrior ♦ Aslatiel of Mirrah ♦ Aurous Knight ♦ Banedigger ♦ Barrel Carrier ♦ Basilisk ♦ Belfry Gargoyle ♦ Bell Keeper ♦ Bell Keeper Mage ♦ Black Drakeblood Knight ♦ Blue Sentinel ♦ Bonewheel Skeleton ♦ Boromir ♦ Bowman Guthry ♦ Butcher Phantom ♦ Catarina Knight ♦ Chariot Lance Executioner ♦ Charred Loyce Knight ♦ Corrosive Egg Crawlers ♦ Covetous Demon ♦ Cragslipper ♦ Crescent Sickle Phantom ♦ crystal lizard ♦ Curse Jar ♦ Dark Priestess ♦ Dark Spirit - A Chip Off the Ol' Rock ♦ Dark Spirit - Abyss Ironclad ♦ Dark Spirit - Forrest Grotesque ♦ Dark Spirit - Pretender to the Xanthous Throne ♦ Dark Spirit - Shadowveil Assassin ♦ Dark Spirit - Tenebrous Rogue ♦ Dark Spirit - The Ghost of Princes Past ♦ Dark Spirit - Underworld Deadeye ♦ Darkdweller ♦ Darksucker ♦ Desert Sorceress ♦ Dingy Cleric Phantom ♦ Dragon ♦ Dragon Acolyte ♦ Dragon Knight ♦ Dragonfang Villard ♦ DragonRider ♦ Drakekeeper ♦ Drakekeeper Knight Phantom ♦ Dual Avelyn Bell Keeper ♦ Dual Avelyn Faraam ♦ Dual Avelyn Phantom ♦ Ducal Spider ♦ Eleum Loyce Giant ♦ elite knight ♦ Enemies ♦ Entity of Avarice ♦ Executioner ♦ Falconer ♦ Faraam Knight Phantom ♦ Fencer Sharron ♦ Flame Lizard ♦ Flexile Sentry ♦ Foreign Wanderer (Under Traveler) ♦ Forlorn ♦ forrest Grotesque ♦ Frozen Reindeer ♦ Fume Sorcerer ♦ Gaoler ♦ Giant Warrior ♦ grand Tusk ♦ Grave Warden ♦ Great Basilisk ♦ Great Giant Warrior ♦ Great Poison Brumer ♦ Greatbow Phantom ♦ Greatsword Bell Keeper ♦ Greatsword Phantom ♦ Guardian Dragon ♦ Gyrm Warrior ♦ Gyrm Worker ♦ Hammersmith ♦ Headless Vengarl ♦ Heide Knight ♦ Hollow Crawler ♦ Hollow Infantry ♦ Hollow Mage ♦ Hollow Mage (Black) ♦ Hollow Peasant ♦ Hollow Priest ♦ Hollow Primal Knight ♦ Hollow Prisoner ♦ Hollow Rogue ♦ Hollow Royal Soldier ♦ Hollow Varangian ♦ Hunting Dog ♦ Hunting Rat ♦ Infantry ♦ Invisible Hollow ♦ Invisible Rogues ♦ Iron Warrior ♦ Ironclad Soldier ♦ Knight Phantom ♦ Leydia Pyromancer ♦ Lion Clan Warrior ♦ Looking Glass Varlet ♦ Maldron the Assassin ♦ Masked Manikin ♦ Melinda the Butcher ♦ Merciless Roenna ♦ Mongrel Rat ♦ Nameless Usurper ♦ Ogre ♦ Old Ironclad Soldier ♦ Oliver The Collector ♦ Poison Statue Cluster ♦ Possessed Armor ♦ Primal Knight ♦ Prisoned Sinner ♦ Prowler Hound ♦ Prowling Magus ♦ Rampart Golem ♦ Rampart Hedgehog ♦ Rampart Soldier ♦ Rampart Spearman ♦ Rampart Stray Dog ♦ Roaming Soul ♦ Roaming Soul - Foreign Wanderer ♦ Rotten Vermin ♦ Royal Soldier ♦ Royal Swordsman ♦ Ruin Sentinel ♦ Rupturing Hollow ♦ Sanctum Knight ♦ Sanctum Priestess ♦ Sanctum Soldier ♦ Screenshots ♦ Skeleton ♦ Spider Drone ♦ Spiders ♦ Stone Knight ♦ Stone Soldier ♦ Stray Hound ♦ Swollen Mongrel ♦ Syan Soldier ♦ The Imperfect ♦ The Pursuer ♦ Tseldoran Settler ♦ Undead Aberration ♦ Undead Crypt Knight ♦ Undead Devourer ♦ Undead Huntsman ♦ Undead Laborer ♦ Vorgel the Sinner ♦ Wall Spectre ♦ Wall Watchman ♦ Washing Pole Phantom ♦ Witchtree ♦ Woodland Child Gully ♦ Woodland Child Victor |

@@ -1,0 +1,3 @@
+# Source: https://darksouls2.wiki.fextralife.com/Purgatory+Guardian+Description
+
+These tall, robed figures guard the wooden bridge leading to the [Undead Purgatory](/Undead+Purgatory). They either wield whips or staff-like weapons (which can be seen in [Shadow Tower Abyss](https://www.youtube.com/watch?v=u5FGP9tcIsY)) that cause high damage. They are easy to stun-lock and backstab. It's preferable that you face them one at time as they tend to be highly aggressive once aggro-ed. They are found in Huntsman's Copse.

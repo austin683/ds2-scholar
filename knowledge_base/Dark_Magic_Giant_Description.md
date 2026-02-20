@@ -1,0 +1,3 @@
+# Source: https://darksouls2.wiki.fextralife.com/Dark+Magic+Giant+Description
+
+Giant hollows ridden by smaller hollows. They will cast extremely dangerous but slow moving dark magic orbs (in fact not magic, they cannot be silenced with [Profound Still](/Profound+Still)) that explode on impact, ranged attacks can take them out rather easily though if you wish to keep your distance, it can also be used for breaking wooden barricades. Staying on higher elevation than them (Outside of poison gas) makes their dark magic orbs easy to dodge.

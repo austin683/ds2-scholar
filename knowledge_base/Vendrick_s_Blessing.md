@@ -1,0 +1,10 @@
+# Source: https://darksouls2.wiki.fextralife.com/Vendrick's+Blessing
+
+# Vendrick's Blessing
+
+Once the player has acquired the 3 Crowns of the Lost Kings ( [Crown of the Sunken King](/Crown+of+the+Sunken+King+Helm "Dark Souls 2 Crown of the Sunken King Helm"), [Crown of the Old Iron King](/Crown+of+the+Old+Iron+King+helm "Dark Souls 2 Crown of the Old Iron King helm"), [Crown of the Ivory King](/Crown+of+the+Ivory+King+helm "Dark Souls 2 Crown of the Ivory King helm")) and the [King's Crown](/King%27s+Crown "Dark Souls 2 King%27s Crown") (requiring the defeat of [Vendrick](/Vendrick "Dark Souls 2 Vendrick")), then they may travel into the [Memory of the King](/Memory+of+the+King "Dark Souls 2 Memory of the King") to receive some new dialogue, a short cutscene, and a blessing from the King. In the cutscene Vendrick appears to infuse the crown your character is holding with a new power. This gives a new bonus to the King's Crown and the 3 DLC crowns where, if worn, the player can no longer hollow or be cursed, similar to if they were wearing a [Ring of Life Protection](/Ring+of+Life+Protection "Dark Souls 2 Ring of Life Protection"). Did the King find a 'cure' to the curse that he had been fighting for so long, or is it just another illusion...
+
+  * Effect doesn't carry into [NG+](/New+Game+Plus "Dark Souls 2 New Game Plus").
+  * While the blessing prevents hollowing on death it doesn't keep your collected [souls](/Souls "Dark Souls 2 Souls") on death (similar to losing as an invading red phantom), causing you to still have to recover your souls.
+  * After getting Vendrick's Blessing in NG+, the crowns from the last playthrough also regain their special abilities (tested with my already upgraded and blessed Crown of the Old Iron King).
+  * It is to be noted, this effect is NOT a buff. This means that you will actually have to wear one of the three DLC crowns before you die, otherwise you will turn hollow.

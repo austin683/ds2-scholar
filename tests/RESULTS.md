@@ -162,3 +162,40 @@ Test methodology: queries sent via `curl`/Python to `POST /ask` with no `player_
 | `knowledge_base/Strength.md` | Corrected two-handing multiplier from 2× to 1.5× in two places (infobox + bullet point) |
 | `knowledge_base/Fragrant_Branch_of_Yore.md` | Prepended 17-location SotFS pickup summary before the verbose "Usage" section |
 | `knowledge_base/Crown_of_the_Old_Iron_King.md` | Prepended SotFS access instructions (Flame Lizard pit key → Iron Keep obelisk) at top of file |
+
+---
+
+## Round 4 — Cheese/Exploit Query Test Bench (Automated)
+
+**Score: 55/55 PASS after 1 fix**
+
+### What Was Tested
+
+16 new automated tests added to `tests/test_rag.py` covering:
+
+| Class | Tests Added | Focus |
+|-------|-------------|-------|
+| `TestMechanicSearch` | 13 | cheese/cheesed/cheeseable/cheesing triggers, suppress_generic flag, GENERIC_TRIGGERS membership, MECHANIC_HINT_OVERRIDES entries |
+| `TestExtractKeyTermsCheeseQueries` | 4 | Term extraction behavior on broad vs specific cheese queries (determines whether suppress_generic fires in retrieve_context) |
+
+### Bug Found & Fixed
+
+| Bug | Root Cause | Fix |
+|-----|-----------|-----|
+| `"cheesing"` queries (gerund form) returned no results | `"cheesing"` doesn't match the `"cheese"` trigger (`\bcheeses?\b` requires word-boundary after "e", but "cheesing" continues with "i") and had no separate entry | Added `"cheesing"` to `MECHANIC_TERM_MAP`, `MECHANIC_HINT_OVERRIDES`, and `GENERIC_TRIGGERS` |
+
+### Suppress-Generic Behavior Verified
+
+| Query Pattern | `terms` non-empty? | suppress_generic | Cheese list injected? |
+|---|---|---|---|
+| `"what bosses can be cheesed"` | No (all lowercase, no proper nouns) | False | **Yes** — all 6 pages |
+| `"Does the Dragonrider have a cheese"` | Yes (`"Dragonrider"`) | True | **No** — Dragonrider.md found via keyword instead |
+| `"can i cheese the smelter demon"` | Yes (lowercase fallback: `"smelter"`, `"demon"`) | True | **No** — Smelter_Demon.md found via keyword/semantic |
+| `"where is gavlan and does he have a cheese"` | Yes (`"gavlan"` via mechanic map fires separately) | True | Cheese list suppressed; Gavlan.md still injected (not a GENERIC_TRIGGER) |
+
+### Cumulative MECHANIC_TERM_MAP Additions (Round 4)
+
+```python
+"cheesing": ["The_Pursuer.md", "Dragonrider.md", "The_Last_Giant.md",
+             "The_Rotten.md", "Ancient_Dragon.md", "Mytha_the_Baneful_Queen.md"],
+```

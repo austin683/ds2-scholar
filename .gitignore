@@ -1,6 +1,5 @@
 .env
 db/
-knowledge_base/
 __pycache__/
 .DS_Store
 node_modules/
