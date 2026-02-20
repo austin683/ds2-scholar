@@ -69,6 +69,7 @@ function App() {
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -137,7 +138,11 @@ function App() {
     localStorage.removeItem('ds2_player_stats');
   };
 
-  const handleClearChat = () => setMessages([]);
+  const handleClearChat = () => {
+    abortControllerRef.current?.abort();
+    setLoading(false);
+    setMessages([]);
+  };
 
   const handleCheckSoulMemory = async () => {
     const sm = stats.soul_memory;
@@ -204,10 +209,14 @@ function App() {
     let accumulated = '';
     let lineBuffer = '';
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const response = await fetch(`${API_URL}/ask-stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        signal: controller.signal,
         body: JSON.stringify({
           question,
           player_stats: buildPlayerStats(),
@@ -249,6 +258,7 @@ function App() {
         }
       }
     } catch (err) {
+      if (err.name === 'AbortError') return;
       const errMsg = { role: 'assistant', content: 'Error: ' + err.message };
       if (assistantAdded) {
         setMessages(prev => {
