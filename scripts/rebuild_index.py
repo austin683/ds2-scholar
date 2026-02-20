@@ -43,7 +43,7 @@ from llama_index.core import (
     StorageContext,
     VectorStoreIndex,
 )
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.embeddings.fastembed import FastEmbedEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 import chromadb
 
@@ -53,7 +53,7 @@ KNOWLEDGE_BASE_DIR = os.path.join(BASE_DIR, "knowledge_base")
 DB_DIR = os.path.join(BASE_DIR, "db")
 INDEX_TIMESTAMP_FILE = os.path.join(DB_DIR, ".index_built_at")
 
-EMBED_MODEL = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
+EMBED_MODEL = FastEmbedEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

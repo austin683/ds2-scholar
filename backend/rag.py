@@ -8,7 +8,7 @@ import time
 from dotenv import load_dotenv
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
 from llama_index.vector_stores.chroma import ChromaVectorStore
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.embeddings.fastembed import FastEmbedEmbedding
 import chromadb
 import anthropic
 
@@ -47,7 +47,7 @@ FILE_READ_MAX_CHARS = 8000
 INDEX_TIMESTAMP_FILE = os.path.join(DB_DIR, ".index_built_at")
 
 # Use a free local embedding model — no OpenAI needed
-EMBED_MODEL = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
+EMBED_MODEL = FastEmbedEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
 # Cached list of all .md filenames in the knowledge base (populated on first use)
 _KB_FILENAMES = None
