@@ -196,7 +196,8 @@ def _restore_baked_index():
         return False
     print("Restoring pre-built index from db_baked/ (this takes seconds, not hours)...")
     shutil.rmtree(DB_DIR, ignore_errors=True)
-    shutil.copytree(DB_BAKED_DIR, DB_DIR)
+    os.makedirs(DB_DIR, exist_ok=True)
+    shutil.copytree(DB_BAKED_DIR, DB_DIR, dirs_exist_ok=True)
     print("Index restored from db_baked/")
     return True
 
