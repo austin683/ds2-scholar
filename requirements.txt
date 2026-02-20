@@ -2,6 +2,9 @@ anthropic
 fastapi
 uvicorn
 llama-index
+llama-index-embeddings-huggingface
+llama-index-vector-stores-chroma
+sentence-transformers
 chromadb
 beautifulsoup4
 html2text
