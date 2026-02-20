@@ -5,6 +5,8 @@
 import os
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 from dotenv import load_dotenv
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader, StorageContext
 from llama_index.vector_stores.chroma import ChromaVectorStore
@@ -21,6 +23,38 @@ DB_DIR = os.path.join(BASE_DIR, "db")
 
 # Anthropic client
 claude = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+
+@lru_cache(maxsize=256)
+def rewrite_query_for_retrieval(question: str, brief_stats: str = "") -> str:
+    """
+    Use Claude Haiku to convert a user question into DS2 retrieval keywords.
+
+    The output is appended to the original question so the existing heuristics
+    (extract_key_terms, mechanic map) still fire on the original phrasing, while
+    the rewritten keywords improve recall for vague or lowercase queries.
+
+    brief_stats: compact player summary, e.g. "STR build, SL62, Greatsword +2, Lost Bastille"
+    Falls back to the original question if the Haiku call fails.
+    """
+    stats_note = f"\nPlayer: {brief_stats}" if brief_stats else ""
+    try:
+        response = claude.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=50,
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"Convert this Dark Souls 2 question into wiki search keywords. "
+                    f"Output ONLY space-separated terms: entity names, stat names, mechanic terms, wiki page names. "
+                    f"No explanation, no punctuation, no full sentences.{stats_note}\n\nQuestion: {question}"
+                ),
+            }],
+        )
+        keywords = response.content[0].text.strip()
+        return f"{question} {keywords}"
+    except Exception:
+        return question
 
 # ─── TWO DATA-PATH ARCHITECTURE ──────────────────────────────────────────────
 # retrieve_context() uses two independent ways to read knowledge_base/ content:
@@ -306,6 +340,39 @@ MECHANIC_TERM_MAP: dict = {
     "scaling":      ["Stat_Scaling.md"],
     "stat scaling": ["Stat_Scaling.md"],
     "attunement slots": ["Attunement.md"],
+    "attunement":   ["Attunement.md"],
+    # Individual stat pages — embedding model can't bridge lowercase stat names
+    "strength":     ["Strength.md", "Stat_Scaling.md"],
+    "dexterity":    ["Dexterity.md", "Stat_Scaling.md"],
+    "vigor":        ["Vigor.md", "Stat_Scaling.md"],
+    "vitality":     ["Vitality.md", "Stat_Scaling.md"],
+    "endurance":    ["Endurance.md", "stamina.md"],
+    "adaptability": ["Adaptability.md", "Agility.md", "Stat_Scaling.md"],
+    "faith":        ["Faith.md", "Stat_Scaling.md"],
+    "intelligence": ["Intelligence.md", "Stat_Scaling.md"],
+    # Lowercase stat abbreviations players use in chat
+    "str":          ["Strength.md", "Stat_Scaling.md"],
+    "dex":          ["Dexterity.md", "Stat_Scaling.md"],
+    "fth":          ["Faith.md", "Stat_Scaling.md"],
+    "adp":          ["Adaptability.md", "Agility.md"],
+    "atn":          ["Attunement.md"],
+    "vgr":          ["Vigor.md"],
+    "vit":          ["Vitality.md"],
+    "int":          ["Intelligence.md", "Stat_Scaling.md"],
+    # Leveling / build progression
+    "soft cap":     ["Stat_Scaling.md", "Level.md"],
+    "softcap":      ["Stat_Scaling.md", "Level.md"],
+    "hard cap":     ["Stat_Scaling.md"],
+    "hardcap":      ["Stat_Scaling.md"],
+    "level":        ["Level.md", "Stat_Scaling.md"],
+    "levels":       ["Level.md", "Stat_Scaling.md"],
+    "level up":     ["Level.md", "Stat_Scaling.md"],
+    "leveling":     ["Level.md", "Stat_Scaling.md"],
+    "invest":       ["Stat_Scaling.md"],
+    "stat points":  ["Level.md", "Stat_Scaling.md"],
+    "attribute":    ["Stats.md", "Stat_Scaling.md"],
+    "attributes":   ["Stats.md", "Stat_Scaling.md"],
+    "stats":        ["Stats.md", "Stat_Scaling.md"],
     # Combat mechanics
     "power stance": ["Power_Stance.md"],
     "powerstance":  ["Power_Stance.md"],
@@ -317,7 +384,31 @@ MECHANIC_TERM_MAP: dict = {
     "riposte":      ["Combat.md"],
     "parry":        ["Combat.md"],
     "durability":   ["Combat.md"],
-    "infusion":     ["Infusion.md"] if os.path.exists(os.path.join(KNOWLEDGE_BASE_DIR, "Infusion.md")) else ["Combat.md"],
+    "infusion":     ["Infusion_Paths.md"],
+    # Infusion stone materials — players often use descriptive names ("lightning stone",
+    # "fire stone") rather than the actual DS2 item names (Boltstone, Firedrake Stone, etc.)
+    "boltstone":        ["Boltstone.md", "Infusion_Paths.md"],
+    "lightning stone":  ["Boltstone.md", "Infusion_Paths.md"],
+    "lightning infusion": ["Boltstone.md", "Infusion_Paths.md"],
+    "firedrake stone":  ["Firedrake_Stone.md", "Infusion_Paths.md"],
+    "fire stone":       ["Firedrake_Stone.md", "Infusion_Paths.md"],
+    "fire infusion":    ["Firedrake_Stone.md", "Infusion_Paths.md"],
+    "darknight stone":  ["Darknight_Stone.md", "Infusion_Paths.md"],
+    "dark night stone": ["Darknight_Stone.md", "Infusion_Paths.md"],
+    "dark stone":       ["Darknight_Stone.md", "Infusion_Paths.md"],
+    "dark infusion":    ["Darknight_Stone.md", "Infusion_Paths.md"],
+    "magic stone":      ["Magic_Stone.md", "Infusion_Paths.md"],
+    "magic infusion":   ["Magic_Stone.md", "Infusion_Paths.md"],
+    "mundane stone":    ["Old_Mundane_Stone.md", "Infusion_Paths.md"],
+    "mundane infusion": ["Old_Mundane_Stone.md", "Infusion_Paths.md"],
+    "old mundane":      ["Old_Mundane_Stone.md"],
+    "raw stone":        ["Raw_Stone.md", "Infusion_Paths.md"],
+    "raw infusion":     ["Raw_Stone.md", "Infusion_Paths.md"],
+    "palestone":        ["Palestone.md", "Infusion_Paths.md"],
+    "bleed stone":      ["Bleed_Stone.md", "Infusion_Paths.md"],
+    "bleed infusion":   ["Bleed_Stone.md"],
+    "poison stone":     ["Poison_Stone.md", "Infusion_Paths.md"],
+    "poison infusion":  ["Poison_Stone.md"],
     "bleed":        ["Bleed.md"],
     "poison":       ["Poison.md"],
     "curse":        ["Curse.md"],
@@ -410,6 +501,53 @@ MECHANIC_TERM_MAP: dict = {
     "rosabeth":            ["Rosabeth_of_Melfia.md"],
     "gavlan":              ["Gavlan.md", "Lonesome_Gavlan.md"],
     "lonesome gavlan":     ["Gavlan.md"],
+    # Bosses — players often write boss names in lowercase or ask "where can I find X boss"
+    # so Title-Case extraction misses them, especially when another capitalized term is
+    # present (e.g. "Lost Bastille") and prevents the lowercase fallback from triggering.
+    # Many boss files also have long compound names (e.g. Ruin_Sentinels_Yahim_Ricce_and_Alessia.md)
+    # that fail exact-match; adding them here guarantees score 0.9 regardless of filename length.
+    "pursuer":             ["The_Pursuer.md"],
+    "ruin sentinel":       ["Ruin_Sentinels_Yahim_Ricce_and_Alessia.md", "Ruin_Sentinel.md"],
+    "ruin sentinels":      ["Ruin_Sentinels_Yahim_Ricce_and_Alessia.md", "Ruin_Sentinel.md"],
+    "yahim":               ["Ruin_Sentinels_Yahim_Ricce_and_Alessia.md"],
+    "lost sinner":         ["Lost_Sinner.md"],
+    "dragonrider":         ["Dragonrider.md", "Twin_Dragonriders.md"],
+    "twin dragonriders":   ["Twin_Dragonriders.md"],
+    "last giant":          ["The_Last_Giant.md"],
+    "looking glass knight": ["Looking_Glass_Knight.md"],
+    "looking glass":       ["Looking_Glass_Knight.md"],
+    "smelter demon":       ["Smelter_Demon.md"],
+    "blue smelter":        ["Blue_Smelter_Demon.md"],
+    "flexile sentry":      ["Flexile_Sentry.md"],
+    "guardian dragon":     ["Guardian_Dragon.md"],
+    "belfry gargoyle":     ["Belfry_Gargoyle.md"],
+    "covetous demon":      ["Covetous_Demon.md"],
+    "skeleton lords":      ["The_Skeleton_Lords.md", "Skeleton_Lords.md"],
+    "skeleton lord":       ["The_Skeleton_Lords.md", "Skeleton_Lords.md"],
+    "scorpioness najka":   ["Scorpioness_Najka.md"],
+    "najka":               ["Scorpioness_Najka.md"],
+    "royal rat authority": ["Royal_Rat_Authority.md"],
+    "royal rat vanguard":  ["Royal_Rat_Vanguard.md"],
+    "mytha":               ["Mytha_the_Baneful_Queen.md"],
+    "baneful queen":       ["Mytha_the_Baneful_Queen.md"],
+    "demon of song":       ["Demon_of_Song.md"],
+    "darklurker":          ["Darklurker.md"],
+    "giant lord":          ["Giant_Lord.md"],
+    "nashandra":           ["Nashandra.md"],
+    "aldia":               ["Aldia_Scholar_of_the_First_Sin.md"],
+    "throne watcher":      ["Throne_Watcher_and_Throne_Defender.md"],
+    "throne defender":     ["Throne_Watcher_and_Throne_Defender.md"],
+    "executioner chariot": ["Executioner_s_Chariot.md"],
+    "old dragonslayer":    ["Old_Dragonslayer.md"],
+    "aava":                ["Aava_the_King_s_Pet.md"],
+    "sinh":                ["Sinh_the_Slumbering_Dragon.md"],
+    "elana":               ["Elana_Squalid_Queen.md"],
+    "fume knight":         ["Fume_Knight.md"],
+    "lud and zallen":      ["Lud_and_Zallen_the_King_s_Pets.md"],
+    "velstadt":            ["Velstadt_the_Royal_Aegis.md"],
+    "vendrick":            ["Vendrick.md"],
+    "ancient dragon":      ["Ancient_Dragon.md"],
+    "the rotten":          ["The_Rotten.md"],
     # Boss cheese / exploit strategies — "cheese" is gaming slang not used consistently in
     # wiki pages; boss pages describe exploits without that word (ballista, fall off, bow trick).
     # Inject the most notable cheese-friendly boss pages so the model can answer aggregation
@@ -611,21 +749,23 @@ def _find_keyword_files(terms: list) -> list:
     return results
 
 
-def retrieve_context(index, query: str, top_k: int = 10, raw_query: str = None) -> str:
+def retrieve_context(index, query: str, top_k: int = 10, raw_query: str = None, brief_stats: str = "") -> str:
     """
     Retrieve the most relevant wiki chunks for a query using hybrid search.
 
     Parameters:
-      query     — full question string (may include player stats preamble) used for
-                  semantic/vector search so the embedding benefits from player context.
-      raw_query — the user's original question WITHOUT any stats preamble, used for
-                  keyword/term extraction and mechanic-term matching so that stat labels
-                  like "Soul Level" or "Current Area" don't crowd the keyword results.
-                  Falls back to `query` if not provided.
+      query       — full question string (may include player stats preamble) used for
+                    semantic/vector search so the embedding benefits from player context.
+      raw_query   — the user's original question WITHOUT any stats preamble, used for
+                    keyword/term extraction and mechanic-term matching so that stat labels
+                    like "Soul Level" or "Current Area" don't crowd the keyword results.
+                    Falls back to `query` if not provided.
+      brief_stats — compact player summary (e.g. "STR build, SL62, Greatsword +2") passed
+                    to the Haiku query rewriter so it can output build-relevant keywords.
 
     Steps:
-      1. Semantic search with similarity_top_k=50 — broad candidate pool.
-      2. Keyword/filename search for capitalized proper nouns (items, NPCs, locations).
+      1. Semantic search + Haiku query rewrite run in parallel (independent operations).
+      2. Keyword/filename search using the rewritten term_query.
       3. Mechanic term map — injects pages for lowercase mechanics the embedding
          model can't bridge (die→Hollowing, hollow→Human_Effigy, covenant→Covenants, …).
       4. Merge all results keyed by filename, boosting pages found by multiple methods.
@@ -634,13 +774,16 @@ def retrieve_context(index, query: str, top_k: int = 10, raw_query: str = None) 
     # Use raw_query for term extraction so player-stats labels don't pollute results
     term_query = raw_query if raw_query is not None else query
 
-    # 1. Semantic search — use a large candidate pool (50) because ChromaDB's HNSW
-    #    approximate search has poor recall at small k with this index size (~21k chunks).
-    #    The hybrid merge below still trims to top_k (default 10) at the end.
-    #    Expand stat abbreviations (INT→Intelligence etc.) so the embedding model
-    #    can bridge short game-stat abbreviations to the full words in wiki text.
+    # 1. Semantic search and Haiku query rewrite run concurrently — they're independent.
+    #    Semantic uses the full augmented query; rewrite enriches term_query for keyword
+    #    and mechanic search. Running in parallel hides the ~300ms Haiku API latency
+    #    behind the ChromaDB HNSW search, cutting pre-stream latency roughly in half.
     retriever = index.as_retriever(similarity_top_k=50)
-    semantic_nodes = retriever.retrieve(_expand_stat_abbrevs(query))
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        semantic_future = executor.submit(retriever.retrieve, _expand_stat_abbrevs(query))
+        rewrite_future = executor.submit(rewrite_query_for_retrieval, term_query, brief_stats)
+        semantic_nodes = semantic_future.result()
+        term_query = rewrite_future.result()
 
     # Deduplicate by NORMALIZED filename so URL-encoded and plain variants of the
     # same file (e.g. "No_Man_27s_Wharf.md" and "No_Man_s_Wharf.md") collapse into
@@ -712,14 +855,15 @@ WHEN CONTEXT IS SUFFICIENT:
 - Be concise but thorough. Use bullet points for lists of items or steps."""
 
 
-def ask(index, question: str, chat_history: list = None, raw_question: str = None) -> str:
+def ask(index, question: str, chat_history: list = None, raw_question: str = None, brief_stats: str = "") -> str:
     """
     Ask a question using RAG + Claude.
     chat_history is a list of {"role": "user"/"assistant", "content": "..."} dicts.
     raw_question is the user's original question without any player stats preamble;
     it is used for keyword/term extraction so stat labels don't pollute results.
+    brief_stats is a compact player summary passed to the Haiku query rewriter.
     """
-    context = retrieve_context(index, question, raw_query=raw_question)
+    context = retrieve_context(index, question, raw_query=raw_question, brief_stats=brief_stats)
 
     messages = []
     if chat_history:
@@ -739,13 +883,14 @@ def ask(index, question: str, chat_history: list = None, raw_question: str = Non
     return response.content[0].text
 
 
-def stream_ask(index, question: str, chat_history: list = None, raw_question: str = None):
+def stream_ask(index, question: str, chat_history: list = None, raw_question: str = None, brief_stats: str = ""):
     """
     Ask a question using RAG + Claude, streaming the response.
     Yields text chunks as they arrive from the API.
     raw_question is the user's original question without any player stats preamble.
+    brief_stats is a compact player summary passed to the Haiku query rewriter.
     """
-    context = retrieve_context(index, question, raw_query=raw_question)
+    context = retrieve_context(index, question, raw_query=raw_question, brief_stats=brief_stats)
 
     messages = []
     if chat_history:

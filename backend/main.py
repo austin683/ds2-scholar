@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import Optional
 import sys
 import os
+import re
 import json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -90,15 +91,83 @@ def _build_term_query(question: str, chat_history: Optional[list]) -> str:
     for msg in reversed(chat_history):
         if isinstance(msg, dict) and msg.get("role") == "user":
             prev = msg.get("content", "")
-            # Only prepend if the current question looks like a follow-up
-            # (short, contains a pronoun, or has fewer than 3 capitalised words)
+            # Only prepend if the current question contains a pronoun — this catches
+            # genuine follow-ups like "Where will he be?" or "What does it drop?"
+            # without injecting irrelevant entity names from the previous turn into
+            # unrelated questions (e.g. "what weapons drop here?" after a boss question).
             import re as _re
             has_pronoun = bool(_re.search(r"\b(he|she|it|they|him|her|them|his|its)\b", question, _re.I))
-            caps_count = len(_re.findall(r"\b[A-Z][a-z]{2,}", question))
-            if has_pronoun or caps_count < 2:
+            if has_pronoun:
                 return f"{prev} {question}"
             break
     return question
+
+
+# Words that signal a build/stat/leveling question — triggers stat context enrichment
+_BUILD_QUESTION_WORDS = {
+    "level", "levels", "leveling", "stat", "stats", "build", "upgrade", "invest",
+    "prioritize", "next", "should", "recommend", "advice", "improve",
+    "focus", "pump", "raise", "increase", "cap", "priority", "put",
+    "stronger", "points", "spend", "allocate",
+    "weapon", "weapons", "infuse", "infusion", "infusing", "swap", "switch",
+}
+
+
+def _brief_player_summary(player_stats) -> str:
+    """
+    Compact one-line summary of player stats for the Haiku rewriter prompt.
+    e.g. "STR build, SL62, Greatsword +2, Lost Bastille"
+    """
+    if not player_stats:
+        return ""
+    parts = []
+    if player_stats.build_type:
+        parts.append(f"{player_stats.build_type} build")
+    if player_stats.soul_level:
+        parts.append(f"SL{player_stats.soul_level}")
+    if player_stats.right_weapon_1:
+        parts.append(player_stats.right_weapon_1)
+    if player_stats.right_weapon_2:
+        parts.append(player_stats.right_weapon_2)
+    if player_stats.current_area:
+        parts.append(player_stats.current_area)
+    return ", ".join(parts)
+
+
+def _enrich_term_query_for_build(term_query: str, player_stats) -> str:
+    """
+    When the question is build/stat adjacent and player stats are set, append
+    the player's build type and primary weapon to the term query.
+
+    This causes the mechanic map to fire for the relevant stat pages
+    (e.g. build_type "Str" → "str" trigger → Strength.md + Stat_Scaling.md)
+    and keyword search to find the weapon page — even when the question itself
+    ("what should I level next?") contains no capitalized entity names.
+
+    Only activates for build-adjacent questions to avoid cluttering context
+    for unrelated queries like location or boss questions.
+    """
+    if not player_stats:
+        return term_query
+
+    q_words = set(re.sub(r"[^a-z\s]", "", term_query.lower()).split())
+    if not q_words & _BUILD_QUESTION_WORDS:
+        return term_query
+
+    extras = []
+
+    # Build type → hits mechanic map (e.g. "str" → Strength.md + Stat_Scaling.md)
+    if player_stats.build_type:
+        extras.append(player_stats.build_type.lower())
+
+    # Both weapons → hits keyword search for weapon pages (strip +X upgrade suffix)
+    for weapon in [player_stats.right_weapon_1, player_stats.right_weapon_2]:
+        if weapon:
+            weapon_clean = re.sub(r"\s*\+\d+$", "", weapon).strip()
+            if weapon_clean:
+                extras.append(weapon_clean)
+
+    return f"{term_query} {' '.join(extras)}" if extras else term_query
 
 
 @app.post("/ask", response_model=AskResponse)
@@ -118,7 +187,9 @@ def ask_question(request: AskRequest):
                 question = f"{context}\n\nQuestion: {request.question}"
 
         term_query = _build_term_query(request.question, request.chat_history)
-        answer = ask(index, question, chat_history=request.chat_history, raw_question=term_query)
+        term_query = _enrich_term_query_for_build(term_query, request.player_stats)
+        brief = _brief_player_summary(request.player_stats)
+        answer = ask(index, question, chat_history=request.chat_history, raw_question=term_query, brief_stats=brief)
         return AskResponse(answer=answer)
 
     except Exception as e:
@@ -138,9 +209,11 @@ def ask_stream(request: AskRequest):
             question = f"{context}\n\nQuestion: {request.question}"
 
     term_query = _build_term_query(request.question, request.chat_history)
+    term_query = _enrich_term_query_for_build(term_query, request.player_stats)
+    brief = _brief_player_summary(request.player_stats)
 
     def generate():
-        for chunk in stream_ask(index, question, chat_history=request.chat_history, raw_question=term_query):
+        for chunk in stream_ask(index, question, chat_history=request.chat_history, raw_question=term_query, brief_stats=brief):
             yield f"data: {json.dumps(chunk)}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")

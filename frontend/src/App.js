@@ -144,6 +144,17 @@ function App() {
     setMessages([]);
   };
 
+  const [copied, setCopied] = useState(false);
+  const handleCopyTranscript = () => {
+    const text = messages.map(m =>
+      `[${m.role === 'user' ? 'You' : 'Scholar'}]\n${m.content}`
+    ).join('\n\n---\n\n');
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
   const handleCheckSoulMemory = async () => {
     const sm = stats.soul_memory;
     const userMsg = { role: 'user', content: 'What is my Soul Memory tier?' };
@@ -199,7 +210,7 @@ function App() {
     const userMsg = { role: 'user', content: question };
     // Capture index before the user message is added (+1 for user msg, that's where assistant goes)
     const assistantIdx = messages.length + 1;
-    const chatHistory = messages.slice(-10);
+    const chatHistory = messages.slice(-6);
 
     setMessages(prev => [...prev, userMsg]);
     setInput('');
@@ -406,12 +417,20 @@ function App() {
           </h1>
 
           {messages.length > 0 && (
-            <button
-              onClick={handleClearChat}
-              className="ml-auto text-neutral-400 hover:text-neutral-200 text-xs bg-neutral-700/50 hover:bg-neutral-700 rounded-full px-3 py-1.5 transition-colors"
-            >
-              Clear Chat
-            </button>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={handleCopyTranscript}
+                className="text-neutral-400 hover:text-neutral-200 text-xs bg-neutral-700/50 hover:bg-neutral-700 rounded-full px-3 py-1.5 transition-colors"
+              >
+                {copied ? 'Copied!' : 'Copy Transcript'}
+              </button>
+              <button
+                onClick={handleClearChat}
+                className="text-neutral-400 hover:text-neutral-200 text-xs bg-neutral-700/50 hover:bg-neutral-700 rounded-full px-3 py-1.5 transition-colors"
+              >
+                Clear Chat
+              </button>
+            </div>
           )}
         </header>
 
