@@ -216,7 +216,14 @@ def ask_stream(request: AskRequest):
         for chunk in stream_ask(index, question, chat_history=request.chat_history, raw_question=term_query, brief_stats=brief):
             yield f"data: {json.dumps(chunk)}\n\n"
 
-    return StreamingResponse(generate(), media_type="text/event-stream")
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # tells Varnish/nginx not to buffer SSE
+        },
+    )
 
 
 @app.post("/soul-memory")
