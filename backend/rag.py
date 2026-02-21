@@ -505,12 +505,20 @@ MECHANIC_TERM_MAP: dict = {
     "pyromancy":        ["Pyromancies.md"],
     "pyromancies":      ["Pyromancies.md"],
     # Weapon upgrade / crafting
-    "upgrade":      ["Upgrades.md"],
-    "upgrades":     ["Upgrades.md"],
-    "reinforce":    ["Upgrades.md"],
-    "titanite":     ["Upgrades.md"],
-    "dull ember":   ["Dull_Ember.md", "Steady_Hand_McDuff.md"],
-    "ember":        ["Dull_Ember.md"],
+    "upgrade":          ["Upgrades.md"],
+    "upgrades":         ["Upgrades.md"],
+    "reinforce":        ["Upgrades.md"],
+    "titanite":         ["Upgrades.md", "Titanite_Shard.md", "Titanite_Chunk.md", "Titanite_Slab.md"],
+    "titanite shard":   ["Titanite_Shard.md"],
+    "titanite shards":  ["Titanite_Shard.md"],
+    "titanite chunk":   ["Titanite_Chunk.md"],
+    "titanite chunks":  ["Titanite_Chunk.md"],
+    "titanite slab":    ["Titanite_Slab.md"],
+    "large titanite":   ["Large_Titanite_Shard.md"],
+    "twinkling titanite": ["Twinkling_Titanite.md"],
+    "petrified dragon bone": ["Petrified_Dragon_Bone.md"],
+    "dull ember":       ["Dull_Ember.md", "Steady_Hand_McDuff.md"],
+    "ember":            ["Dull_Ember.md"],
     # Exploration / items
     "torch":        ["Torch.md"],
     "pharros":      ["Pharros_Lockstone.md"],
@@ -834,10 +842,17 @@ def retrieve_context(index, query: str, top_k: int = 10, raw_query: str = None, 
     #    Semantic uses the full augmented query; rewrite enriches term_query for keyword
     #    and mechanic search. Running in parallel hides the ~300ms Haiku API latency
     #    behind the ChromaDB HNSW search, cutting pre-stream latency roughly in half.
+    # Use the raw question (without player-stats preamble) for the semantic embedding.
+    # Including "Current Area: Lost Bastille" in the embedding vector biases results toward
+    # area files even for unrelated questions ("where can I buy titanite shards?").
+    # The full preamble is still sent to Claude for generation — it just shouldn't
+    # distort which wiki pages get retrieved.
+    semantic_query = _expand_stat_abbrevs(term_query)
+
     t0 = time.time()
     retriever = index.as_retriever(similarity_top_k=50)
     with ThreadPoolExecutor(max_workers=2) as executor:
-        semantic_future = executor.submit(retriever.retrieve, _expand_stat_abbrevs(query))
+        semantic_future = executor.submit(retriever.retrieve, semantic_query)
         rewrite_future = executor.submit(rewrite_query_for_retrieval, term_query, brief_stats)
         semantic_nodes = semantic_future.result()
         t_semantic = time.time()
