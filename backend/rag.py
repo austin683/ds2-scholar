@@ -834,12 +834,16 @@ def retrieve_context(index, query: str, top_k: int = 10, raw_query: str = None, 
     #    Semantic uses the full augmented query; rewrite enriches term_query for keyword
     #    and mechanic search. Running in parallel hides the ~300ms Haiku API latency
     #    behind the ChromaDB HNSW search, cutting pre-stream latency roughly in half.
+    t0 = time.time()
     retriever = index.as_retriever(similarity_top_k=50)
     with ThreadPoolExecutor(max_workers=2) as executor:
         semantic_future = executor.submit(retriever.retrieve, _expand_stat_abbrevs(query))
         rewrite_future = executor.submit(rewrite_query_for_retrieval, term_query, brief_stats)
         semantic_nodes = semantic_future.result()
+        t_semantic = time.time()
         term_query = rewrite_future.result()
+        t_rewrite = time.time()
+    print(f"[TIMING] semantic={t_semantic-t0:.2f}s  rewrite={t_rewrite-t0:.2f}s  parallel_wall={t_rewrite-t0:.2f}s")
 
     # Deduplicate by NORMALIZED filename so URL-encoded and plain variants of the
     # same file (e.g. "No_Man_27s_Wharf.md" and "No_Man_s_Wharf.md") collapse into
@@ -853,6 +857,7 @@ def retrieve_context(index, query: str, top_k: int = 10, raw_query: str = None, 
             scored[nkey] = (node.text, node.metadata, node_score)
 
     # 2. Keyword/filename search (proper nouns — capitalized terms in raw question only)
+    t_kw0 = time.time()
     terms = extract_key_terms(term_query)
     if terms:
         for content, metadata, kw_score in _find_keyword_files(terms):
@@ -878,6 +883,7 @@ def retrieve_context(index, query: str, top_k: int = 10, raw_query: str = None, 
             scored[nkey] = (content, prev_meta, prev_score + mech_score)
         else:
             scored[nkey] = (content, metadata, mech_score)
+    print(f"[TIMING] keyword+mechanic={time.time()-t_kw0:.2f}s")
 
     # 4. Sort by combined score descending, keep top_k
     sorted_results = sorted(scored.values(), key=lambda x: x[2], reverse=True)[:top_k]
@@ -946,7 +952,10 @@ def stream_ask(index, question: str, chat_history: list = None, raw_question: st
     raw_question is the user's original question without any player stats preamble.
     brief_stats is a compact player summary passed to the Haiku query rewriter.
     """
+    t_start = time.time()
     context = retrieve_context(index, question, raw_query=raw_question, brief_stats=brief_stats)
+    t_retrieved = time.time()
+    print(f"[TIMING] retrieve_context total={t_retrieved-t_start:.2f}s")
 
     messages = []
     if chat_history:
@@ -962,7 +971,11 @@ def stream_ask(index, question: str, chat_history: list = None, raw_question: st
         system=SYSTEM_PROMPT,
         messages=messages,
     ) as stream:
+        first_token = True
         for text in stream.text_stream:
+            if first_token:
+                print(f"[TIMING] time_to_first_token={time.time()-t_retrieved:.2f}s  total_pre_stream={time.time()-t_start:.2f}s")
+                first_token = False
             yield text
 
 
