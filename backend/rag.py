@@ -190,6 +190,21 @@ def _check_index_freshness() -> None:
         print()
 
 
+def _db_has_embeddings() -> bool:
+    """Check if the local db has a populated embeddings table — without opening ChromaDB."""
+    import sqlite3 as _sq
+    sqlite_path = os.path.join(DB_DIR, "chroma.sqlite3")
+    if not os.path.exists(sqlite_path):
+        return False
+    try:
+        conn = _sq.connect(sqlite_path)
+        count = conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0]
+        conn.close()
+        return count > 0
+    except Exception:
+        return False
+
+
 def _restore_baked_index():
     """Copy the pre-built index from db_baked/ into db/. Much faster than rebuilding."""
     if not os.path.isdir(DB_BAKED_DIR):
@@ -204,6 +219,12 @@ def _restore_baked_index():
 
 def get_index():
     """Load existing index from ChromaDB or build it from knowledge base."""
+    # Check db health via raw sqlite BEFORE opening ChromaDB (avoids WAL contamination).
+    if not _db_has_embeddings():
+        print("DB missing or empty — restoring from db_baked/ before opening ChromaDB...")
+        if not _restore_baked_index():
+            print("No db_baked/ found — will build from scratch.")
+
     def _open_collection():
         client = chromadb.PersistentClient(path=DB_DIR)
         return client, client.get_or_create_collection("ds2_scholar")
@@ -212,7 +233,7 @@ def get_index():
         chroma_client, chroma_collection = _open_collection()
     except Exception as e:
         if "no such column" in str(e) or "OperationalError" in type(e).__name__:
-            print(f"ChromaDB schema mismatch ({e}). Attempting restore from db_baked/...")
+            print(f"ChromaDB schema mismatch ({e}). Restoring from db_baked/...")
             if not _restore_baked_index():
                 print("No db_baked/ found — falling back to full rebuild (may take a long time).")
             chroma_client, chroma_collection = _open_collection()
@@ -231,7 +252,7 @@ def get_index():
         )
         _check_index_freshness()
     else:
-        # db/ is empty — try baked snapshot first, then fall back to full rebuild
+        # Restore and reload — this path only hit if baked was unavailable above
         if _restore_baked_index():
             chroma_client, chroma_collection = _open_collection()
             vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
