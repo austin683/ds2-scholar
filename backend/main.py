@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.rag import ask, stream_ask, index
 from backend.utils import get_soul_memory_tier, format_player_context
 
-app = FastAPI(title="DS2 Scholar API")
+app = FastAPI(title="Scholar API")
 
 # Allow React frontend to talk to backend.
 # ALLOWED_ORIGINS is a comma-separated list of origins (no trailing slashes).
@@ -75,7 +75,7 @@ class SoulMemoryRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "message": "DS2 Scholar is ready."}
+    return {"status": "ok", "message": "Scholar is ready."}
 
 
 def _build_term_query(question: str, chat_history: Optional[list]) -> str:
@@ -224,6 +224,7 @@ def ask_stream(request: AskRequest):
             "X-Accel-Buffering": "no",  # tells Varnish/nginx not to buffer SSE
         },
     )
+
 
 
 @app.post("/soul-memory")

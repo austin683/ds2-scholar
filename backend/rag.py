@@ -77,7 +77,7 @@ def rewrite_query_for_retrieval(question: str, brief_stats: str = "") -> str:
 
 # Maximum characters read from a single file in PATH B (keyword / mechanic search).
 # Section-aware truncation in _read_file_section keeps this from cutting mid-section.
-FILE_READ_MAX_CHARS = 8000
+FILE_READ_MAX_CHARS = 5000
 
 # Timestamp file written when the index is freshly built; used for stale detection.
 INDEX_TIMESTAMP_FILE = os.path.join(DB_DIR, ".index_built_at")
@@ -87,6 +87,17 @@ EMBED_MODEL = FastEmbedEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
 # Cached list of all .md filenames in the knowledge base (populated on first use)
 _KB_FILENAMES = None
+
+# Module-level retrieval cache — avoids re-running the full hybrid search for
+# identical queries (e.g. user submits the same question twice, or chat history
+# causes the same raw_query to be processed multiple times in a session).
+# Key: (term_query, top_k, brief_stats). FIFO eviction at 256 entries.
+_RETRIEVE_CACHE: dict = {}
+_RETRIEVE_CACHE_MAX = 256
+
+# Auto n-gram filename lookup — populated lazily on first use (needs KB dir ready).
+# Maps normalized filenames (lowercase, underscores→spaces) to actual filenames.
+_FNAME_LOOKUP = None  # dict or None; populated lazily on first use
 
 
 def _norm_fname(fname: str) -> str:
@@ -395,26 +406,40 @@ MECHANIC_TERM_MAP: dict = {
     "item find":    ["Item_Discovery.md"],
     "scaling":      ["Stat_Scaling.md"],
     "stat scaling": ["Stat_Scaling.md"],
-    "attunement slots": ["Attunement.md"],
-    "attunement":   ["Attunement.md"],
-    # Individual stat pages — embedding model can't bridge lowercase stat names
-    "strength":     ["Strength.md", "Stat_Scaling.md"],
-    "dexterity":    ["Dexterity.md", "Stat_Scaling.md"],
+    # Southern Ritual Band is the staple ring for any spell-slotter needing extra attunement.
+    # It's never surfaced by semantic search on "attunement" alone (BGE-small can't bridge it),
+    # so pin it here so any attunement question mentions both the stat and the ring.
+    "attunement slots": ["Attunement.md", "Southern_Ritual_Band.md"],
+    "attunement":   ["Attunement.md", "Southern_Ritual_Band.md"],
+    # Individual stat pages — embedding model can't bridge lowercase stat names.
+    # Build-staple rings/armor pinned alongside each stat so that build advice queries
+    # always surface the most commonly missed gear for each archetype:
+    #   STR  → Flynn's Ring (phys ATK scales with low equip load — counterintuitive for STR
+    #           builds but critical if you want to stay under 30%), Stone Ring (poise dmg)
+    #   DEX  → Old Leo Ring (thrust counter attacks; most DEX weapons are thrust-type),
+    #           Flynn's Ring (same light-load bonus applies)
+    #   INT  → Ring of Knowledge (+INT), Clear Bluestone Ring (cast speed), Southern
+    #           Ritual Band (extra slots) + King's Crown already included below
+    #   FTH  → Ring of Prayer (+5 FTH), Saint's Hood (bonus miracle uses) + King's Crown
+    #   HEX  → see "hex"/"hexes" entries below; both INT and FTH get King's Crown here
+    "strength":     ["Strength.md", "Stat_Scaling.md", "Flynn_s_Ring.md", "Stone_Ring.md"],
+    "dexterity":    ["Dexterity.md", "Stat_Scaling.md", "Old_Leo_Ring.md", "Flynn_s_Ring.md"],
     "vigor":        ["Vigor.md", "Stat_Scaling.md"],
     "vitality":     ["Vitality.md", "Stat_Scaling.md"],
-    "endurance":    ["Endurance.md", "stamina.md"],
+    "endurance":    ["Endurance.md", "stamina.md", "Chloranthy_Ring.md"],
     "adaptability": ["Adaptability.md", "Agility.md", "Stat_Scaling.md"],
-    "faith":        ["Faith.md", "Stat_Scaling.md"],
-    "intelligence": ["Intelligence.md", "Stat_Scaling.md"],
-    # Lowercase stat abbreviations players use in chat
-    "str":          ["Strength.md", "Stat_Scaling.md"],
-    "dex":          ["Dexterity.md", "Stat_Scaling.md"],
-    "fth":          ["Faith.md", "Stat_Scaling.md"],
+    "faith":        ["Faith.md", "Stat_Scaling.md", "King_s_Crown.md", "Ring_of_Prayer.md", "Saint_s_Hood.md"],
+    "intelligence": ["Intelligence.md", "Stat_Scaling.md", "King_s_Crown.md", "Ring_of_Knowledge.md", "Clear_Bluestone_Ring.md"],
+    # Lowercase stat abbreviations players use in chat (same build-staple logic, trimmed
+    # to the single most impactful item so short queries don't over-flood the context)
+    "str":          ["Strength.md", "Stat_Scaling.md", "Flynn_s_Ring.md", "Stone_Ring.md"],
+    "dex":          ["Dexterity.md", "Stat_Scaling.md", "Old_Leo_Ring.md"],
+    "fth":          ["Faith.md", "Stat_Scaling.md", "Ring_of_Prayer.md"],
     "adp":          ["Adaptability.md", "Agility.md"],
-    "atn":          ["Attunement.md"],
+    "atn":          ["Attunement.md", "Southern_Ritual_Band.md"],
     "vgr":          ["Vigor.md"],
     "vit":          ["Vitality.md"],
-    "int":          ["Intelligence.md", "Stat_Scaling.md"],
+    "int":          ["Intelligence.md", "Stat_Scaling.md", "Ring_of_Knowledge.md"],
     # Leveling / build progression
     "soft cap":     ["Stat_Scaling.md", "Level.md"],
     "softcap":      ["Stat_Scaling.md", "Level.md"],
@@ -488,22 +513,30 @@ MECHANIC_TERM_MAP: dict = {
     "boss souls":   ["Boss_Souls.md"],
     "soul vessel":  ["Soul_Vessel.md"] if os.path.exists(os.path.join(KNOWLEDGE_BASE_DIR, "Soul_Vessel.md")) else ["Stats.md"],
     "respec":       ["Soul_Vessel.md"] if os.path.exists(os.path.join(KNOWLEDGE_BASE_DIR, "Soul_Vessel.md")) else ["Stats.md"],
-    # Spell schools — embedding model can't bridge short query words to correct pages
-    "hex":          ["Hexes.md"],
-    "hexes":        ["Hexes.md"],
-    "dark magic":   ["Hexes.md"],
-    "dark spell":   ["Hexes.md"],
-    "dark spells":  ["Hexes.md"],
+    # Spell schools — embedding model can't bridge short query words to correct pages.
+    # Build-staple gear pinned alongside each school:
+    #   HEX       → King's Crown (+3 INT/FTH), Abyss Seal (+hex dmg at HP cost),
+    #               Clear Bluestone Ring (cast speed), Southern Ritual Band (slots)
+    #   SORCERY   → Clear Bluestone Ring (cast speed), Southern Ritual Band (slots)
+    #   MIRACLE   → Ring of Prayer (+5 FTH), Saint's Hood (bonus miracle uses),
+    #               Southern Ritual Band (slots), Clear Bluestone Ring (cast speed)
+    #   PYROMANCY → Dark Pyromancy Flame (scales with Hollowing — commonly missed),
+    #               Southern Ritual Band (slots)
+    "hex":          ["Hexes.md", "King_s_Crown.md", "Abyss_Seal.md", "Clear_Bluestone_Ring.md", "Southern_Ritual_Band.md"],
+    "hexes":        ["Hexes.md", "King_s_Crown.md", "Abyss_Seal.md", "Clear_Bluestone_Ring.md", "Southern_Ritual_Band.md"],
+    "dark magic":   ["Hexes.md", "King_s_Crown.md", "Abyss_Seal.md"],
+    "dark spell":   ["Hexes.md", "King_s_Crown.md", "Abyss_Seal.md"],
+    "dark spells":  ["Hexes.md", "King_s_Crown.md", "Abyss_Seal.md"],
     "sorcery trainer":  ["Carhillion_of_the_Fold.md"],
-    "sorcery":          ["Sorceries.md"],
-    "sorceries":        ["Sorceries.md"],
+    "sorcery":          ["Sorceries.md", "Clear_Bluestone_Ring.md", "Southern_Ritual_Band.md"],
+    "sorceries":        ["Sorceries.md", "Clear_Bluestone_Ring.md", "Southern_Ritual_Band.md"],
     "hex trainer":      ["Felkin_the_Outcast.md"],
     "miracle trainer":  ["Licia_of_Lindeldt.md"],
-    "miracle":          ["Miracles.md"],
-    "miracles":         ["Miracles.md"],
+    "miracle":          ["Miracles.md", "Ring_of_Prayer.md", "Saint_s_Hood.md", "Southern_Ritual_Band.md", "Clear_Bluestone_Ring.md"],
+    "miracles":         ["Miracles.md", "Ring_of_Prayer.md", "Saint_s_Hood.md", "Southern_Ritual_Band.md", "Clear_Bluestone_Ring.md"],
     "pyromancy trainer": ["Rosabeth_of_Melfia.md"],
-    "pyromancy":        ["Pyromancies.md"],
-    "pyromancies":      ["Pyromancies.md"],
+    "pyromancy":        ["Pyromancies.md", "Dark_Pyromancy_Flame.md", "Southern_Ritual_Band.md"],
+    "pyromancies":      ["Pyromancies.md", "Dark_Pyromancy_Flame.md", "Southern_Ritual_Band.md"],
     # Weapon upgrade / crafting
     "upgrade":          ["Upgrades.md"],
     "upgrades":         ["Upgrades.md"],
@@ -526,10 +559,19 @@ MECHANIC_TERM_MAP: dict = {
     "fragrant branch": ["Fragrant_Branch_of_Yore.md"],
     "branch of yore":  ["Fragrant_Branch_of_Yore.md"],
     "unpetrify":       ["Fragrant_Branch_of_Yore.md"],
-    # DLC areas — embedding model fails to bridge short area names to DLC pages
+    # DLC areas — embedding model fails to bridge short area names to DLC pages.
+    # Also add broad "dlc" triggers so queries like "how do I access the DLC"
+    # don't fail on first attempt waiting for Haiku to rewrite "DLC" → crown names.
+    "dlc":             ["DLC.md", "Crown_of_the_Sunken_King.md", "Crown_of_the_Old_Iron_King.md", "Crown_of_the_Ivory_King.md"],
+    "downloadable":    ["DLC.md", "Crown_of_the_Sunken_King.md", "Crown_of_the_Old_Iron_King.md", "Crown_of_the_Ivory_King.md"],
+    "crown dlc":       ["DLC.md", "Crown_of_the_Sunken_King.md", "Crown_of_the_Old_Iron_King.md", "Crown_of_the_Ivory_King.md"],
     "brume tower":     ["Brume_Tower.md", "Crown_of_the_Old_Iron_King.md"],
+    "old iron king dlc": ["Crown_of_the_Old_Iron_King.md"],
     "sunken king":     ["Crown_of_the_Sunken_King.md"] if os.path.exists(os.path.join(KNOWLEDGE_BASE_DIR, "Crown_of_the_Sunken_King.md")) else [],
     "ivory king":      ["Crown_of_the_Ivory_King.md"] if os.path.exists(os.path.join(KNOWLEDGE_BASE_DIR, "Crown_of_the_Ivory_King.md")) else [],
+    "dragon talon":    ["Dragon_Talon.md", "Crown_of_the_Sunken_King.md"],
+    "frozen flower":   ["Frozen_Flower.md", "Crown_of_the_Ivory_King.md"],
+    "forgotten key":   ["Forgotten_Key.md", "Crown_of_the_Sunken_King.md"],
     # Death / soul recovery — bloodstain mechanic
     "bloodstain":      ["Soul_Memory.md", "Hollowing.md"],
     "blood stain":     ["Soul_Memory.md", "Hollowing.md"],
@@ -563,8 +605,68 @@ MECHANIC_TERM_MAP: dict = {
     "felkin":              ["Felkin_the_Outcast.md"],
     "carhillion":          ["Carhillion_of_the_Fold.md"],
     "rosabeth":            ["Rosabeth_of_Melfia.md"],
+    "chloanne":            ["Stone_Trader_Chloanne.md"],
+    "stone trader":        ["Stone_Trader_Chloanne.md"],
+    "melentia":            ["Merchant_Hag_Melentia.md"],
+    "merchant hag":        ["Merchant_Hag_Melentia.md"],
+    "saulden":             ["Crestfallen_Saulden.md"],
+    "crestfallen saulden": ["Crestfallen_Saulden.md"],
     "gavlan":              ["Gavlan.md", "Lonesome_Gavlan.md"],
     "lonesome gavlan":     ["Gavlan.md"],
+    # Majula hub NPCs
+    "emerald herald":      ["Emerald_Herald.md"],
+    "herald":              ["Emerald_Herald.md"],
+    "shalquoir":           ["Sweet_Shalquoir.md"],
+    "sweet shalquoir":     ["Sweet_Shalquoir.md"],
+    "maughlin":            ["Maughlin_the_Armourer.md"],
+    "cromwell":            ["Cromwell_the_Pardoner.md"],
+    "gilligan":            ["Laddersmith_Gilligan.md"],
+    "laddersmith":         ["Laddersmith_Gilligan.md"],
+    # Questline / summonable NPCs
+    "lucatiel":            ["Lucatiel_of_Mirrah.md"],
+    "benhart":             ["Benhart_of_Jugo.md"],
+    "pate":                ["Mild_Mannered_Pate.md"],
+    "mild mannered pate":  ["Mild_Mannered_Pate.md"],
+    "creighton":           ["Creighton_of_Mirrah.md", "Creighton_the_Wanderer.md"],
+    "felicia":             ["Felicia_the_Brave.md"],
+    "bellclaire":          ["Pilgrim_Bellclaire.md"],
+    "pilgrim bellclaire":  ["Pilgrim_Bellclaire.md"],
+    "jester thomas":       ["Jester_Thomas.md"],
+    # Other named NPCs
+    "agdayne":             ["Grave_Warden_Agdayne.md"],
+    "grave warden":        ["Grave_Warden_Agdayne.md"],
+    "vengarl":             ["Head_of_Vengarl.md"],
+    "head of vengarl":     ["Head_of_Vengarl.md"],
+    "magerold":            ["Magerold_of_Lanafir.md"],
+    "wellager":            ["Chancellor_Wellager.md"],
+    "chancellor wellager": ["Chancellor_Wellager.md"],
+    "drummond":            ["Captain_Drummond.md"],
+    "dyna and tillo":      ["Dyna_and_Tillo.md"],
+    "dyna":                ["Dyna_and_Tillo.md"],
+    "tillo":               ["Dyna_and_Tillo.md"],
+    "milfanito":           ["Milfanito.md"],
+    "feeva":               ["Abbess_Feeva.md"],
+    "titchy gren":         ["Titchy_Gren.md"],
+    "alsanna":             ["Alsanna_Silent_Oracle.md"],
+    "duke tseldora":       ["Duke_Tseldora.md"],
+    # Area access — "how to get to X" is often on a DIFFERENT page than the area itself.
+    # Huntsman's Copse: access mechanism (Licia rotating the pillar) is documented on
+    # Heide's Tower page, not on Huntsman's Copse page.
+    "huntsman":            ["Huntsman_s_Copse.md", "Heide_s_Tower_of_Flame.md"],
+    "huntsman's copse":    ["Huntsman_s_Copse.md", "Heide_s_Tower_of_Flame.md"],
+    "huntsmans copse":     ["Huntsman_s_Copse.md", "Heide_s_Tower_of_Flame.md"],
+    # Dark Chasm of Old: basic access on its own page, but detailed covenant joining
+    # steps (offer Human Effigy to Grandahl at 3 locations) are on Pilgrims_of_Dark.md.
+    "dark chasm":          ["Dark_Chasm_of_Old.md", "Pilgrims_of_Dark.md"],
+    "chasm of old":        ["Dark_Chasm_of_Old.md", "Pilgrims_of_Dark.md"],
+    "pilgrims of dark":    ["Pilgrims_of_Dark.md", "Dark_Chasm_of_Old.md"],
+    "grandahl":            ["Pilgrims_of_Dark.md"],
+    "darkdiver":           ["Pilgrims_of_Dark.md"],
+    # Dragon Aerie / Aldia's Keep — access is cross-referenced between the two pages.
+    "dragon aerie":        ["Dragon_Aerie.md", "Aldia_s_Keep.md"],
+    "aldia":               ["Aldia_s_Keep.md", "Aldia_Scholar_of_the_First_Sin.md"],
+    "aldia's keep":        ["Aldia_s_Keep.md"],
+    "aldias keep":         ["Aldia_s_Keep.md"],
     # Bosses — players often write boss names in lowercase or ask "where can I find X boss"
     # so Title-Case extraction misses them, especially when another capitalized term is
     # present (e.g. "Lost Bastille") and prevents the lowercase fallback from triggering.
@@ -585,6 +687,11 @@ MECHANIC_TERM_MAP: dict = {
     "flexile sentry":      ["Flexile_Sentry.md"],
     "guardian dragon":     ["Guardian_Dragon.md"],
     "belfry gargoyle":     ["Belfry_Gargoyle.md"],
+    # Belfry areas — access directions are in Bell_Keepers.md, not the area pages themselves
+    "belfry luna":         ["Belfry_Luna.md", "Bell_Keepers.md"],
+    "belfry sol":          ["Belfry_Sol.md", "Bell_Keepers.md"],
+    "bell keeper":         ["Bell_Keepers.md"],
+    "bell keepers":        ["Bell_Keepers.md"],
     "covetous demon":      ["Covetous_Demon.md"],
     "skeleton lords":      ["The_Skeleton_Lords.md", "Skeleton_Lords.md"],
     "skeleton lord":       ["The_Skeleton_Lords.md", "Skeleton_Lords.md"],
@@ -625,6 +732,54 @@ MECHANIC_TERM_MAP: dict = {
     "cheesing":   ["The_Pursuer.md", "Dragonrider.md", "The_Last_Giant.md",
                    "The_Rotten.md", "Ancient_Dragon.md", "Mytha_the_Baneful_Queen.md"],
     "easy boss":  ["The_Pursuer.md", "Dragonrider.md", "The_Last_Giant.md"],
+    # Staves / catalysts — "staff" / "staves" / "catalyst" queries miss the overview without this
+    "staff":        ["Staves.md"],
+    "staves":       ["Staves.md"],
+    "stave":        ["Staves.md"],
+    "catalyst":     ["Staves.md"],
+    "catalysts":    ["Staves.md"],
+    "sorcery staff": ["Staves.md"],
+    "hex staff":    ["Staves.md", "Sunset_Staff.md", "Transgressor_s_Staff.md"],
+    "bone staff":   ["Bone_Staff.md"],
+    "sunset staff": ["Sunset_Staff.md"],
+    "transgressor": ["Transgressor_s_Staff.md"],
+    "black witch staff": ["Black_Witch_s_Staff.md"],
+    # Starting classes / character creation
+    "starting class":  ["Classes.md"],
+    "starting classes": ["Classes.md"],
+    "best class":      ["Classes.md"],
+    "which class":     ["Classes.md"],
+    "what class":      ["Classes.md"],
+    "class for":       ["Classes.md"],
+    "cleric class":    ["Classes.md"],
+    "sorcerer class":  ["Classes.md"],
+    "deprived":        ["Classes.md"],
+    # Game progress / area order / navigation — players frequently ask "what area is next"
+    # or "how do I get to X" which fail without an explicit route page in the map.
+    "walkthrough":    ["Game_Progress_Route.md", "Guides_Walkthroughs.md"],
+    "game progress":  ["Game_Progress_Route.md"],
+    "area order":     ["Game_Progress_Route.md"],
+    "order of areas": ["Game_Progress_Route.md"],
+    "next area":      ["Game_Progress_Route.md"],
+    "all areas":      ["Game_Progress_Route.md"],
+    "area progression": ["Game_Progress_Route.md"],
+    "game route":     ["Game_Progress_Route.md"],
+    "progress route": ["Game_Progress_Route.md"],
+    "how to get to":  ["Game_Progress_Route.md"],
+    "what area":      ["Game_Progress_Route.md"],
+    "what areas":     ["Game_Progress_Route.md"],
+    "areas in":       ["Game_Progress_Route.md"],
+    "before huntsman": ["Game_Progress_Route.md"],
+    "after bastille":  ["Game_Progress_Route.md"],
+    # Game overview — queries with zero DS2-specific terms ("what is this game about?")
+    # return nothing from semantic or keyword search; these entries guarantee the right
+    # page is injected. Lore.md is intentionally excluded here: adding bare "lore" or
+    # "story" would fire on specific NPC/boss queries ("lore behind the pursuer") and
+    # crowd out the correct item/NPC pages. Story queries already work via semantic search.
+    "what is this game":  ["About_Dark_Souls_2.md", "Dark_Souls_II_Scholar_of_the_First_Sin.md"],
+    "about this game":    ["About_Dark_Souls_2.md", "Dark_Souls_II_Scholar_of_the_First_Sin.md"],
+    "game overview":      ["About_Dark_Souls_2.md"],
+    "about dark souls":   ["About_Dark_Souls_2.md"],
 }
 
 
@@ -639,6 +794,12 @@ MECHANIC_HINT_OVERRIDES: dict = {
     "cheeseable": ["strategy", "tips", "notes", "exploit", "hints"],
     "cheesing":   ["strategy", "tips", "notes", "exploit", "hints"],
     "easy boss":  ["strategy", "tips", "hints"],
+    # About_Dark_Souls_2.md is 14 KB — starts at "Dark Souls II Overview" heading
+    # rather than the release-date metadata table at the top of the file.
+    "what is this game":  ["overview"],
+    "about this game":    ["overview"],
+    "game overview":      ["overview"],
+    "about dark souls":   ["overview"],
 }
 
 # Triggers whose injected page lists are "aggregation" answers — useful for broad questions
@@ -813,7 +974,78 @@ def _find_keyword_files(terms: list) -> list:
     return results
 
 
-def retrieve_context(index, query: str, top_k: int = 10, raw_query: str = None, brief_stats: str = "") -> str:
+def _build_fname_lookup() -> dict:
+    """
+    Build a dict mapping every normalized KB filename to its actual filename.
+
+    Normalization strips .md, lowercases, expands URL-encoded sequences
+    (_27_ → space), and converts underscores/hyphens to spaces.
+    e.g. "Titanite_Shard.md" → "titanite shard"
+         "Crown_of_the_Sunken_King.md" → "crown of the sunken king"
+         "Black_Witch_27s_Staff.md" → "black witch s staff"
+
+    Used by _auto_filename_search to match n-grams from the user's query directly
+    against page names — no manual MECHANIC_TERM_MAP entry needed for straightforward
+    item/area names.
+    """
+    lookup: dict = {}
+    for fname in _get_kb_filenames():
+        norm = fname[:-3].lower()
+        norm = re.sub(r"_[0-9a-f]{2}_?", " ", norm)   # URL-encoded chars → space
+        norm = re.sub(r"[_\-]", " ", norm)             # underscores/hyphens → space
+        norm = re.sub(r"\s+", " ", norm).strip()
+        if norm:
+            lookup[norm] = fname
+    return lookup
+
+
+def _auto_filename_search(query: str) -> list:
+    """
+    Extract 4→3→2-word n-grams from the lowercase query and match them against
+    the normalized KB filename lookup (_FNAME_LOOKUP).
+
+    Longer n-grams are tried first (more specific); once a span is consumed it is
+    not reused for shorter grams, preventing over-matching.
+
+    Returns (content, metadata, score) tuples. Score 0.7 — higher than fuzzy
+    keyword match (0.5) but below the manual mechanic map (0.9).
+
+    This supplements the mechanic map for item/area names that map directly to a
+    wiki page without needing a conceptual bridge (e.g. "bone staff" → Bone_Staff.md,
+    "iron keep" → Iron_Keep.md). It does NOT replace entries like "die"→Hollowing.md
+    where there is no filename correspondence.
+    """
+    global _FNAME_LOOKUP
+    if _FNAME_LOOKUP is None:
+        _FNAME_LOOKUP = _build_fname_lookup()
+
+    q_clean = re.sub(r"[^a-z0-9\s]", " ", query.lower())
+    words = q_clean.split()
+
+    results = []
+    seen_fnames: set = set()
+    used_positions: set = set()  # word indices already consumed by a longer n-gram
+
+    for n in (4, 3, 2):
+        for i in range(len(words) - n + 1):
+            # Skip if any position in this span was already used by a longer gram
+            span = set(range(i, i + n))
+            if span & used_positions:
+                continue
+            gram = " ".join(words[i:i + n])
+            if gram in _FNAME_LOOKUP:
+                fname = _FNAME_LOOKUP[gram]
+                if fname not in seen_fnames:
+                    seen_fnames.add(fname)
+                    used_positions |= span
+                    fpath = os.path.join(KNOWLEDGE_BASE_DIR, fname)
+                    content = _read_file_section(fpath, gram.split())
+                    results.append((content, {"file_name": fname}, 0.7))
+
+    return results
+
+
+def retrieve_context(index, query: str, top_k: int = 7, raw_query: str = None, brief_stats: str = "") -> str:
     """
     Retrieve the most relevant wiki chunks for a query using hybrid search.
 
@@ -837,6 +1069,13 @@ def retrieve_context(index, query: str, top_k: int = 10, raw_query: str = None, 
     """
     # Use raw_query for term extraction so player-stats labels don't pollute results
     term_query = raw_query if raw_query is not None else query
+
+    # Cache check — identical queries (same raw text, top_k, player summary) skip
+    # the full hybrid search pipeline and return the previously computed context.
+    cache_key = (term_query, top_k, brief_stats)
+    if cache_key in _RETRIEVE_CACHE:
+        print("[TIMING] retrieve_context cache hit — skipping pipeline")
+        return _RETRIEVE_CACHE[cache_key]
 
     # 1. Semantic search and Haiku query rewrite run concurrently — they're independent.
     #    Semantic uses the full augmented query; rewrite enriches term_query for keyword
@@ -898,7 +1137,18 @@ def retrieve_context(index, query: str, top_k: int = 10, raw_query: str = None, 
             scored[nkey] = (content, prev_meta, prev_score + mech_score)
         else:
             scored[nkey] = (content, metadata, mech_score)
-    print(f"[TIMING] keyword+mechanic={time.time()-t_kw0:.2f}s")
+
+    # 3b. Auto n-gram filename search — catches item/area names that map directly to a
+    #     wiki page without a manual MECHANIC_TERM_MAP entry (score 0.7).
+    for content, metadata, auto_score in _auto_filename_search(term_query):
+        fname = metadata.get("file_name", "unknown")
+        nkey = _norm_fname(fname)
+        if nkey in scored:
+            _prev_text, prev_meta, prev_score = scored[nkey]
+            scored[nkey] = (content, prev_meta, prev_score + auto_score)
+        else:
+            scored[nkey] = (content, metadata, auto_score)
+    print(f"[TIMING] keyword+mechanic+auto={time.time()-t_kw0:.2f}s")
 
     # 4. Sort by combined score descending, keep top_k
     sorted_results = sorted(scored.values(), key=lambda x: x[2], reverse=True)[:top_k]
@@ -908,10 +1158,16 @@ def retrieve_context(index, query: str, top_k: int = 10, raw_query: str = None, 
         source = metadata.get("file_name", "unknown")
         context_parts.append(f"--- Source: {source} ---\n{text}")
 
-    return "\n\n".join(context_parts)
+    result = "\n\n".join(context_parts)
+
+    # Store in cache with FIFO eviction
+    if len(_RETRIEVE_CACHE) >= _RETRIEVE_CACHE_MAX:
+        _RETRIEVE_CACHE.pop(next(iter(_RETRIEVE_CACHE)))
+    _RETRIEVE_CACHE[cache_key] = result
+    return result
 
 
-SYSTEM_PROMPT = """You are DS2 Scholar, a Dark Souls 2 companion AI grounded strictly in the Fextralife wiki context provided below.
+SYSTEM_PROMPT = """You are Scholar, a Dark Souls 2 companion AI grounded strictly in the Fextralife wiki context provided below.
 
 The player is using Scholar of the First Sin (SotFS). When the wiki context contains SotFS-specific notes (marked with "Scholar of the First Sin" or "SotFS"), those apply to this player and should be preferred over vanilla DS2 information.
 
@@ -921,12 +1177,29 @@ CRITICAL RULES — THESE OVERRIDE EVERYTHING ELSE:
 2. Your training knowledge about Dark Souls 2 is COMPLETELY OFF-LIMITS — not for locations, NPC questlines, item stats, lore, boss strategies, or anything else.
 3. EVEN IF you are 100% certain you know the correct answer from your training data, you MUST NOT use it. Certainty does not grant permission to use training knowledge.
 4. Do NOT speculate, do NOT say "I believe" or "I think", do NOT add caveats like "from my previous knowledge" — just cite the wiki or admit the gap.
-5. If a previous assistant message in the conversation stated something that is NOT supported by the CURRENT wiki context block, do not treat it as fact. Prior responses may have hallucinated; the current context block is the only source of truth.
+5. If the current wiki context block DIRECTLY CONTRADICTS something in a prior assistant message, correct it. Otherwise, do NOT proactively self-correct prior responses — the absence of a topic from the current wiki context is not evidence of a hallucination. Prior Soul Memory tier calculations and player stat summaries come from a verified backend calculator, not training knowledge, and should not be second-guessed.
 
-WHEN CONTEXT IS INSUFFICIENT: respond with exactly — "The wiki context I retrieved doesn't cover that — I'd recommend checking the Fextralife wiki directly." Then stop. Do not add guesses or partial answers.
+WHEN CONTEXT IS INSUFFICIENT — choose ONE of these based on why:
+
+A) If the question is too vague, ambiguous, or could refer to multiple things, ask a SHORT clarifying follow-up question. ALWAYS format the options as a numbered list so the player can reply with just a number:
+   "Which are you asking about?
+   1. [First option]
+   2. [Second option]"
+   Use 2–4 options maximum. Do not guess — just ask.
+
+B) If the question is clear but the wiki context genuinely doesn't have the answer, respond with a short sentence naming the specific thing you couldn't find — e.g. "The wiki doesn't have anything on the Grass Crest Shield." or "The wiki context doesn't cover music composition." Then stop.
+
+Do not add guesses or partial answers in either case.
+
+SPOILER SENSITIVITY: When answering questions about the game's overall story, main narrative, or plot:
+- The basic premise (Bearer of the Curse journeying to Drangleic, collecting four Great Souls) is not a spoiler — share it freely.
+- EVERY mention of the true main antagonist, the final boss, any secret or alternate final boss, any ending details, or any other end-game revelation must be wrapped in ||double pipes|| — including follow-up sentences in the same response. If a response contains multiple spoiler facts, wrap each one separately. Do not add a separate warning line; the interface shows the label automatically.
+- Example with two spoiler blocks: "The Bearer seeks four Great Souls. ||Nashandra is the true antagonist.|| The SotFS edition adds a secret boss. ||Aldia, Scholar of the First Sin, is a new optional final boss exclusive to SotFS whose defeat unlocks an alternate ending.||"
+- This rule applies regardless of the player's current progress. It does NOT apply to standard boss lore or NPC backstory questions (e.g. "what's the lore behind the Pursuer?" does not require spoiler wrapping).
 
 WHEN CONTEXT IS SUFFICIENT:
 - Only state things directly supported by the wiki text. Do not add surrounding details from training.
+- Every specific item name, stat value, location, and NPC detail you mention must be directly supported by the wiki context. You may read tables and perform simple deductions from that data (e.g. reading an upgrade cost table to determine what level a weapon reaches after N upgrades) — but never introduce facts or claims not derivable from the wiki context.
 - For directions: reference the nearest bonfire as a starting point.
 - For build advice: consider the player's current stats and progression.
 - Be concise but thorough. Use bullet points for lists of items or steps."""

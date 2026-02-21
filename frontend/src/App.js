@@ -36,6 +36,22 @@ const STAT_KEY_MAP = {
   off_hand: 'right_weapon_2',
 };
 
+/**
+ * Extract numbered options from an assistant message.
+ * Matches lines like "1. Some option text" or "  2. Another option".
+ * Returns an array of option strings if 2+ sequential options found, else [].
+ */
+const parseNumberedOptions = (text) => {
+  const opts = {};
+  for (const line of text.split('\n')) {
+    const m = line.match(/^\s*(\d+)\.\s+(.+)/);
+    if (m) opts[parseInt(m[1])] = m[2].trim();
+  }
+  const result = [];
+  for (let i = 1; opts[i]; i++) result.push(opts[i]);
+  return result.length >= 2 ? result : [];
+};
+
 const DEFAULT_STATS = {
   soul_level: '',
   soul_memory: '',
@@ -62,6 +78,7 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [revealedSpoilers, setRevealedSpoilers] = useState(new Set());
   const [levelModalOpen, setLevelModalOpen] = useState(false);
   const [levelDraft, setLevelDraft] = useState({});
   const [levelStep, setLevelStep] = useState('count'); // 'count' | 'distribute'
@@ -142,6 +159,7 @@ function App() {
     abortControllerRef.current?.abort();
     setLoading(false);
     setMessages([]);
+    setRevealedSpoilers(new Set());
   };
 
   const [copied, setCopied] = useState(false);
@@ -194,8 +212,20 @@ function App() {
   };
 
   const handleSend = async (overrideQuestion) => {
-    const question = (overrideQuestion ?? input).trim();
-    if (!question || loading) return;
+    const rawInput = (overrideQuestion ?? input).trim();
+    if (!rawInput || loading) return;
+
+    // Number shortcut: if user typed a single digit, check if the last assistant
+    // message had numbered clarifying options and expand to the full option text.
+    let question = rawInput;
+    if (/^\d$/.test(rawInput) && messages.length > 0) {
+      const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant');
+      if (lastAssistant) {
+        const opts = parseNumberedOptions(lastAssistant.content);
+        const idx = parseInt(rawInput) - 1;
+        if (opts[idx]) question = opts[idx];
+      }
+    }
 
     // /level — open the level-up modal
     if (question === '/level') {
@@ -290,6 +320,58 @@ function App() {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const mdComponents = {
+    h1: ({ children }) => <h1 className="text-[#c9a84c] font-bold text-base mt-3 mb-1 first:mt-0">{children}</h1>,
+    h2: ({ children }) => <h2 className="text-[#c9a84c] font-bold text-sm mt-3 mb-1 first:mt-0">{children}</h2>,
+    h3: ({ children }) => <h3 className="text-[#c9a84c] font-semibold text-sm mt-2 mb-1 first:mt-0">{children}</h3>,
+    p: ({ children }) => <p className="mb-2 last:mb-0 text-neutral-200">{children}</p>,
+    ul: ({ children }) => <ul className="list-disc list-outside pl-5 mb-2 space-y-1">{children}</ul>,
+    ol: ({ children }) => <ol className="list-decimal list-outside pl-5 mb-2 space-y-1">{children}</ol>,
+    li: ({ children }) => <li className="text-neutral-200 leading-relaxed">{children}</li>,
+    strong: ({ children }) => <strong className="text-neutral-100 font-semibold">{children}</strong>,
+    em: ({ children }) => <em className="text-neutral-300 italic">{children}</em>,
+    code: ({ children }) => <code className="bg-neutral-900/80 text-yellow-300 rounded px-1 py-0.5 text-xs font-mono">{children}</code>,
+    pre: ({ children }) => <pre className="bg-neutral-900/80 rounded-lg p-3 mb-2 overflow-x-auto text-xs font-mono text-yellow-200">{children}</pre>,
+    hr: () => <hr className="border-neutral-700 my-2" />,
+    table: ({ children }) => <div className="overflow-x-auto mb-2"><table className="w-full border-collapse text-xs">{children}</table></div>,
+    thead: ({ children }) => <thead className="bg-neutral-900/60">{children}</thead>,
+    tbody: ({ children }) => <tbody>{children}</tbody>,
+    tr: ({ children }) => <tr className="border-b border-neutral-700/50">{children}</tr>,
+    th: ({ children }) => <th className="text-left text-[#c9a84c] font-semibold px-3 py-1.5 border border-neutral-700/50 whitespace-nowrap">{children}</th>,
+    td: ({ children }) => <td className="text-neutral-200 px-3 py-1.5 border border-neutral-700/50">{children}</td>,
+  };
+
+  const renderMessageContent = (content, msgIndex, isStreaming) => {
+    if (isStreaming || !content.includes('||')) {
+      return <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{content}</ReactMarkdown>;
+    }
+    const parts = content.split('||');
+    return (
+      <>
+        {parts.map((part, pi) => {
+          if (pi % 2 === 1) {
+            const key = `${msgIndex}-${pi}`;
+            const revealed = revealedSpoilers.has(key);
+            return revealed ? (
+              <div key={key} className="my-1 pl-3 border-l-2 border-yellow-700/50">
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{part}</ReactMarkdown>
+              </div>
+            ) : (
+              <button
+                key={key}
+                onClick={() => setRevealedSpoilers(prev => new Set([...prev, key]))}
+                className="block bg-neutral-700 hover:bg-neutral-600 text-neutral-400 hover:text-neutral-300 text-xs rounded px-3 py-1.5 my-1 cursor-pointer transition-colors select-none"
+              >
+                ⚠️ Spoiler — click to reveal
+              </button>
+            );
+          }
+          return part ? <ReactMarkdown key={pi} remarkPlugins={[remarkGfm]} components={mdComponents}>{part}</ReactMarkdown> : null;
+        })}
+      </>
+    );
   };
 
   return (
@@ -485,7 +567,7 @@ function App() {
           {messages.map((msg, i) => (
             <div
               key={i}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
             >
               <div
                 className={`max-w-[75%] px-4 py-2.5 text-sm leading-relaxed break-words ${
@@ -494,34 +576,28 @@ function App() {
                     : 'bg-neutral-800 text-neutral-200 rounded-2xl rounded-bl-none shadow-md shadow-black/30'
                 }`}
               >
-                {msg.role === 'user' ? msg.content : (
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      h1: ({ children }) => <h1 className="text-[#c9a84c] font-bold text-base mt-3 mb-1 first:mt-0">{children}</h1>,
-                      h2: ({ children }) => <h2 className="text-[#c9a84c] font-bold text-sm mt-3 mb-1 first:mt-0">{children}</h2>,
-                      h3: ({ children }) => <h3 className="text-[#c9a84c] font-semibold text-sm mt-2 mb-1 first:mt-0">{children}</h3>,
-                      p: ({ children }) => <p className="mb-2 last:mb-0 text-neutral-200">{children}</p>,
-                      ul: ({ children }) => <ul className="list-disc list-outside pl-5 mb-2 space-y-1">{children}</ul>,
-                      ol: ({ children }) => <ol className="list-decimal list-outside pl-5 mb-2 space-y-1">{children}</ol>,
-                      li: ({ children }) => <li className="text-neutral-200 leading-relaxed">{children}</li>,
-                      strong: ({ children }) => <strong className="text-neutral-100 font-semibold">{children}</strong>,
-                      em: ({ children }) => <em className="text-neutral-300 italic">{children}</em>,
-                      code: ({ children }) => <code className="bg-neutral-900/80 text-yellow-300 rounded px-1 py-0.5 text-xs font-mono">{children}</code>,
-                      pre: ({ children }) => <pre className="bg-neutral-900/80 rounded-lg p-3 mb-2 overflow-x-auto text-xs font-mono text-yellow-200">{children}</pre>,
-                      hr: () => <hr className="border-neutral-700 my-2" />,
-                      table: ({ children }) => <div className="overflow-x-auto mb-2"><table className="w-full border-collapse text-xs">{children}</table></div>,
-                      thead: ({ children }) => <thead className="bg-neutral-900/60">{children}</thead>,
-                      tbody: ({ children }) => <tbody>{children}</tbody>,
-                      tr: ({ children }) => <tr className="border-b border-neutral-700/50">{children}</tr>,
-                      th: ({ children }) => <th className="text-left text-[#c9a84c] font-semibold px-3 py-1.5 border border-neutral-700/50 whitespace-nowrap">{children}</th>,
-                      td: ({ children }) => <td className="text-neutral-200 px-3 py-1.5 border border-neutral-700/50">{children}</td>,
-                    }}
-                  >
-                    {msg.content}
-                  </ReactMarkdown>
-                )}
+                {msg.role === 'user' ? msg.content : renderMessageContent(msg.content, i, loading && i === messages.length - 1)}
               </div>
+              {msg.role === 'assistant' && i === messages.length - 1 && !loading && (() => {
+                const opts = parseNumberedOptions(msg.content);
+                if (opts.length < 2) return null;
+                return (
+                  <div className="flex items-center gap-1.5 mt-1.5 ml-1">
+                    <span className="text-neutral-600 text-xs">Type</span>
+                    {opts.map((opt, oi) => (
+                      <button
+                        key={oi}
+                        onClick={() => handleSend(String(oi + 1))}
+                        title={opt}
+                        className="text-xs text-neutral-500 hover:text-yellow-400 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700/80 rounded px-1.5 py-0.5 transition-colors leading-none"
+                      >
+                        {oi + 1}
+                      </button>
+                    ))}
+                    <span className="text-neutral-600 text-xs">to select</span>
+                  </div>
+                );
+              })()}
             </div>
           ))}
 
