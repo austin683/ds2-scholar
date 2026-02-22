@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
-# DS2 Scholar — start backend + frontend in separate Terminal tabs
+# DS Scholar — start backend + frontend in separate Terminal tabs
 
-PROJ="$HOME/Desktop/ds2_scholar"
+PROJ="$HOME/Desktop/ds_scholar"
 
-osascript <<EOF
+osascript <<APPLESCRIPT
 tell application "Terminal"
     activate
 
-    -- Tab 1: backend
-    do script "echo '⚔  DS2 Scholar — Backend'; cd $PROJ && python3 -m backend.main"
+    -- Tab 1: backend (DS2 + ER)
+    do script "echo '⚔  DS Scholar — Backend'; cd $PROJ && python3 -m backend.main"
 
     delay 0.6
 
-    -- Open Tab 2 via Terminal's process (ensures keystroke lands in the right app)
     tell application "System Events"
         tell process "Terminal"
             keystroke "t" using {command down}
@@ -22,6 +21,6 @@ tell application "Terminal"
     delay 0.6
 
     -- Tab 2: frontend
-    do script "echo '🔥 DS2 Scholar — Frontend'; cd $PROJ/frontend && PORT=3001 npm start" in front window
+    do script "echo '⚔  DS Scholar — Frontend'; cd $PROJ/frontend && PORT=3001 npm start" in front window
 end tell
-EOF
+APPLESCRIPT

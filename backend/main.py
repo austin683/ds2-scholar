@@ -1,5 +1,6 @@
-# FastAPI application entry point for the DS2 Scholar backend.
+# FastAPI application entry point for the Scholar backend.
 # Defines API routes for querying the RAG pipeline and serving responses to the frontend.
+# Supports multiple games in a single process — game_id is sent per-request from the frontend.
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +14,7 @@ import json
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from backend.rag import ask, stream_ask, index
+from backend.rag import ask, stream_ask, _INDEXES, _ALL_CONFIGS
 from backend.utils import get_soul_memory_tier, format_player_context
 
 app = FastAPI(title="Scholar API")
@@ -38,18 +39,25 @@ app.add_middleware(
 # REQUEST / RESPONSE MODELS
 # ─────────────────────────────────────────
 
+# All stat fields for all supported games — optional so any game subset works.
 class PlayerStats(BaseModel):
     soul_level: Optional[int] = None
+    # DS2 only
     soul_memory: Optional[int] = None
-    vigor: Optional[int] = None
-    endurance: Optional[int] = None
     vitality: Optional[int] = None
     attunement: Optional[int] = None
+    adaptability: Optional[int] = None
+    # Shared stats
+    vigor: Optional[int] = None
+    endurance: Optional[int] = None
     strength: Optional[int] = None
     dexterity: Optional[int] = None
-    adaptability: Optional[int] = None
     intelligence: Optional[int] = None
     faith: Optional[int] = None
+    # ER only
+    mind: Optional[int] = None
+    arcane: Optional[int] = None
+    # Shared
     right_weapon_1: Optional[str] = None
     right_weapon_2: Optional[str] = None
     current_area: Optional[str] = None
@@ -61,12 +69,14 @@ class AskRequest(BaseModel):
     question: str
     player_stats: Optional[PlayerStats] = None
     chat_history: Optional[list] = None
+    game_id: str = "ds2"
 
 class AskResponse(BaseModel):
     answer: str
 
 class SoulMemoryRequest(BaseModel):
     soul_memory: int
+    game_id: str = "ds2"
 
 
 # ─────────────────────────────────────────
@@ -75,7 +85,8 @@ class SoulMemoryRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "message": "Scholar is ready."}
+    games = ", ".join(_ALL_CONFIGS.keys())
+    return {"status": "ok", "message": f"Scholar RAG API ready (games: {games})"}
 
 
 def _build_term_query(question: str, chat_history: Optional[list]) -> str:
@@ -103,15 +114,6 @@ def _build_term_query(question: str, chat_history: Optional[list]) -> str:
     return question
 
 
-# Words that signal a build/stat/leveling question — triggers stat context enrichment
-_BUILD_QUESTION_WORDS = {
-    "level", "levels", "leveling", "stat", "stats", "build", "upgrade", "invest",
-    "prioritize", "next", "should", "recommend", "advice", "improve",
-    "focus", "pump", "raise", "increase", "cap", "priority", "put",
-    "stronger", "points", "spend", "allocate",
-    "weapon", "weapons", "infuse", "infusion", "infusing", "swap", "switch",
-}
-
 
 def _brief_player_summary(player_stats) -> str:
     """
@@ -134,7 +136,7 @@ def _brief_player_summary(player_stats) -> str:
     return ", ".join(parts)
 
 
-def _enrich_term_query_for_build(term_query: str, player_stats) -> str:
+def _enrich_term_query_for_build(term_query: str, player_stats, config) -> str:
     """
     When the question is build/stat adjacent and player stats are set, append
     the player's build type and primary weapon to the term query.
@@ -151,7 +153,7 @@ def _enrich_term_query_for_build(term_query: str, player_stats) -> str:
         return term_query
 
     q_words = set(re.sub(r"[^a-z\s]", "", term_query.lower()).split())
-    if not q_words & _BUILD_QUESTION_WORDS:
+    if not q_words & config.build_question_words:
         return term_query
 
     extras = []
@@ -177,19 +179,22 @@ def ask_question(request: AskRequest):
     Returns an answer grounded in the Fextralife wiki.
     """
     try:
+        config = _ALL_CONFIGS.get(request.game_id, _ALL_CONFIGS["ds2"])
+        idx = _INDEXES[config.game_id]
+
         # Build question with player context if stats provided
         question = request.question
         if request.player_stats:
             stats_dict = request.player_stats.dict(exclude_none=True)
             print(f"[DEBUG] /ask player_stats received: {stats_dict}")
             if stats_dict:
-                context = format_player_context(stats_dict)
+                context = format_player_context(stats_dict, config)
                 question = f"{context}\n\nQuestion: {request.question}"
 
         term_query = _build_term_query(request.question, request.chat_history)
-        term_query = _enrich_term_query_for_build(term_query, request.player_stats)
+        term_query = _enrich_term_query_for_build(term_query, request.player_stats, config)
         brief = _brief_player_summary(request.player_stats)
-        answer = ask(index, question, chat_history=request.chat_history, raw_question=term_query, brief_stats=brief)
+        answer = ask(idx, question, config=config, chat_history=request.chat_history, raw_question=term_query, brief_stats=brief)
         return AskResponse(answer=answer)
 
     except Exception as e:
@@ -201,19 +206,22 @@ def ask_stream(request: AskRequest):
     """
     Streaming RAG endpoint. Returns Server-Sent Events with text chunks.
     """
+    config = _ALL_CONFIGS.get(request.game_id, _ALL_CONFIGS["ds2"])
+    idx = _INDEXES[config.game_id]
+
     question = request.question
     if request.player_stats:
         stats_dict = request.player_stats.dict(exclude_none=True)
         if stats_dict:
-            context = format_player_context(stats_dict)
+            context = format_player_context(stats_dict, config)
             question = f"{context}\n\nQuestion: {request.question}"
 
     term_query = _build_term_query(request.question, request.chat_history)
-    term_query = _enrich_term_query_for_build(term_query, request.player_stats)
+    term_query = _enrich_term_query_for_build(term_query, request.player_stats, config)
     brief = _brief_player_summary(request.player_stats)
 
     def generate():
-        for chunk in stream_ask(index, question, chat_history=request.chat_history, raw_question=term_query, brief_stats=brief):
+        for chunk in stream_ask(idx, question, config=config, chat_history=request.chat_history, raw_question=term_query, brief_stats=brief):
             yield f"data: {json.dumps(chunk)}\n\n"
 
     return StreamingResponse(
@@ -231,8 +239,12 @@ def ask_stream(request: AskRequest):
 def check_soul_memory(request: SoulMemoryRequest):
     """
     Returns Soul Memory tier info and matchmaking range.
+    Only available when the active game config includes a Soul Memory system.
     """
-    result = get_soul_memory_tier(request.soul_memory)
+    config = _ALL_CONFIGS.get(request.game_id, _ALL_CONFIGS["ds2"])
+    if config.soul_memory is None:
+        raise HTTPException(status_code=404, detail="Soul Memory is not part of this game.")
+    result = get_soul_memory_tier(request.soul_memory, config.soul_memory)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result

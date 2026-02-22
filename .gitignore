@@ -1,5 +1,9 @@
 .env
-db/chroma.sqlite3
+.env.local
+db/
+db_baked/
+knowledge_base/
+knowledge_base_er/
 __pycache__/
 .DS_Store
 node_modules/

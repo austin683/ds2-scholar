@@ -2,77 +2,61 @@ import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import DS2_CONFIG from './gameConfig';
+import ER_CONFIG from './erConfig';
+const ALL_CONFIGS = { ds2: DS2_CONFIG, er: ER_CONFIG };
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8001';
 
-const SLASH_COMMANDS = [
-  { cmd: '/level', desc: 'Open level-up stat allocator' },
-];
-
-const STAT_FIELDS = [
-  { key: 'vgr', label: 'VGR', icon: '/icons/icon-vigor.png' },
-  { key: 'end', label: 'END', icon: '/icons/icon-endurance.png' },
-  { key: 'vit', label: 'VIT', icon: '/icons/icon-vitality.png' },
-  { key: 'atn', label: 'ATN', icon: '/icons/icon-attunement.png' },
-  { key: 'str', label: 'STR', icon: '/icons/icon-strength.png' },
-  { key: 'dex', label: 'DEX', icon: '/icons/icon-dexterity.png' },
-  { key: 'adp', label: 'ADP', icon: '/icons/icon-adaptability.png' },
-  { key: 'int', label: 'INT', icon: '/icons/icon-intelligence.png' },
-  { key: 'fth', label: 'FTH', icon: '/icons/icon-faith.png' },
-];
-
-// Maps the short frontend stat keys to the long names the backend PlayerStats model expects
-const STAT_KEY_MAP = {
-  vgr: 'vigor',
-  end: 'endurance',
-  vit: 'vitality',
-  atn: 'attunement',
-  str: 'strength',
-  dex: 'dexterity',
-  adp: 'adaptability',
-  int: 'intelligence',
-  fth: 'faith',
-  main_hand: 'right_weapon_1',
-  off_hand: 'right_weapon_2',
-};
-
 /**
- * Extract numbered options from an assistant message.
- * Matches lines like "1. Some option text" or "  2. Another option".
- * Returns an array of option strings if 2+ sequential options found, else [].
+ * Extract numbered clarifying options from an assistant message.
+ * Only returns options when the numbered list is preceded by a question (line ending in "?").
+ * This prevents informational numbered lists (e.g. "The next two areas are: 1. X 2. Y")
+ * from being mistaken for clarifying options.
+ * Returns an array of 2–4 option strings, else [].
  */
 const parseNumberedOptions = (text) => {
+  const lines = text.split('\n');
+
+  // Find the first "1. ..." line
+  let firstIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*1\.\s+/.test(lines[i])) { firstIdx = i; break; }
+  }
+  if (firstIdx === -1) return [];
+
+  // The nearest non-empty line before "1." must end with "?" to be a clarifying question
+  let prevLine = '';
+  for (let i = firstIdx - 1; i >= 0; i--) {
+    if (lines[i].trim()) { prevLine = lines[i].trim(); break; }
+  }
+  if (!prevLine.endsWith('?')) return [];
+
   const opts = {};
-  for (const line of text.split('\n')) {
+  for (const line of lines) {
     const m = line.match(/^\s*(\d+)\.\s+(.+)/);
     if (m) opts[parseInt(m[1])] = m[2].trim();
   }
   const result = [];
   for (let i = 1; opts[i]; i++) result.push(opts[i]);
-  return result.length >= 2 ? result : [];
-};
-
-const DEFAULT_STATS = {
-  soul_level: '',
-  soul_memory: '',
-  vgr: '', end: '', vit: '', atn: '',
-  str: '', dex: '', adp: '', int: '', fth: '',
-  main_hand: '',
-  off_hand: '',
-  build_type: '',
-  current_area: '',
-  last_boss_defeated: '',
-  notes: '',
+  return result.length >= 2 && result.length <= 4 ? result : [];
 };
 
 function App() {
+  const [gameId, setGameId] = useState('ds2');
+  const GAME_CONFIG = ALL_CONFIGS[gameId];
+  const SLASH_COMMANDS = GAME_CONFIG.slashCommands;
+  const STAT_FIELDS    = GAME_CONFIG.statFields;
+  // Maps the short frontend stat keys to the long names the backend PlayerStats model expects
+  const STAT_KEY_MAP   = GAME_CONFIG.statKeyMap;
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [stats, setStats] = useState(() => {
     try {
-      const saved = localStorage.getItem('ds2_player_stats');
-      return saved ? JSON.parse(saved) : DEFAULT_STATS;
+      const saved = localStorage.getItem(DS2_CONFIG.localStorageKey);
+      return saved ? JSON.parse(saved) : DS2_CONFIG.defaultStats;
     } catch {
-      return DEFAULT_STATS;
+      return DS2_CONFIG.defaultStats;
     }
   });
   const [messages, setMessages] = useState([]);
@@ -93,8 +77,8 @@ function App() {
   }, [messages, loading]);
 
   useEffect(() => {
-    localStorage.setItem('ds2_player_stats', JSON.stringify(stats));
-  }, [stats]);
+    localStorage.setItem(GAME_CONFIG.localStorageKey, JSON.stringify(stats));
+  }, [stats, gameId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStatChange = (key, value) => {
     setStats(prev => ({ ...prev, [key]: value }));
@@ -151,8 +135,23 @@ function App() {
   };
 
   const handleClearStats = () => {
-    setStats(DEFAULT_STATS);
-    localStorage.removeItem('ds2_player_stats');
+    setStats(GAME_CONFIG.defaultStats);
+    localStorage.removeItem(GAME_CONFIG.localStorageKey);
+  };
+
+  const handleGameSwitch = (newGameId) => {
+    if (newGameId === gameId) return;
+    const newConfig = ALL_CONFIGS[newGameId];
+    try {
+      const saved = localStorage.getItem(newConfig.localStorageKey);
+      setStats(saved ? JSON.parse(saved) : newConfig.defaultStats);
+    } catch {
+      setStats(newConfig.defaultStats);
+    }
+    setGameId(newGameId);
+    setMessages([]);
+    setRevealedSpoilers(new Set());
+    setInput('');
   };
 
   const handleClearChat = () => {
@@ -165,7 +164,7 @@ function App() {
   const [copied, setCopied] = useState(false);
   const handleCopyTranscript = () => {
     const text = messages.map(m =>
-      `[${m.role === 'user' ? 'You' : 'Scholar'}]\n${m.content}`
+      `[${m.role === 'user' ? 'You' : GAME_CONFIG.botName}]\n${m.content}`
     ).join('\n\n---\n\n');
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
@@ -186,6 +185,7 @@ function App() {
     try {
       const res = await axios.post(`${API_URL}/soul-memory`, {
         soul_memory: parseInt(sm, 10),
+        game_id: gameId,
       }, { headers: { 'ngrok-skip-browser-warning': 'true' } });
       const d = res.data;
       const tierRange = d.tier_range.replace(' - ', '–');
@@ -237,6 +237,24 @@ function App() {
       return;
     }
 
+    // /clear — wipe chat history
+    if (question === '/clear') {
+      setMessages([]);
+      setInput('');
+      return;
+    }
+
+    // /area <name> — update current area without opening the sidebar
+    if (question.startsWith('/area ')) {
+      const areaName = question.slice(6).trim();
+      if (areaName) {
+        setStats(prev => ({ ...prev, current_area: areaName }));
+        setMessages(prev => [...prev, { role: 'assistant', content: `Current area updated to **${areaName}**.` }]);
+      }
+      setInput('');
+      return;
+    }
+
     const userMsg = { role: 'user', content: question };
     // Capture index before the user message is added (+1 for user msg, that's where assistant goes)
     const assistantIdx = messages.length + 1;
@@ -262,6 +280,7 @@ function App() {
           question,
           player_stats: buildPlayerStats(),
           chat_history: chatHistory,
+          game_id: gameId,
         }),
       });
 
@@ -386,23 +405,25 @@ function App() {
         <div className="relative h-full min-w-[20rem]">
 
           {/* Title — pinned top */}
-          <div className="absolute top-0 left-0 right-0 h-[72px] flex items-end justify-center pb-3 pointer-events-none z-10">
+          <div className="absolute top-0 left-0 right-0 h-[72px] flex items-end justify-center pb-4 pointer-events-none z-10">
             <div className="flex flex-col items-center gap-1">
                 <div className="text-yellow-500 text-2xl leading-tight" style={{ fontFamily: 'OptimusPrinceps, serif' }}>Player Stats</div>
                 <div className="h-[1.5px] w-44" style={{ background: 'linear-gradient(to right, transparent, #ca8a04ff, transparent)' }} />
               </div>
           </div>
 
-          {/* Grid + button — flow from just below title, space absorbs at bottom */}
-          <div className="absolute top-[72px] bottom-0 left-0 right-0 flex flex-col overflow-hidden px-7">
+          {/* Grid + button — grid scrolls, Clear Stats pinned at bottom */}
+          <div className="absolute top-[72px] bottom-0 left-0 right-0 flex flex-col overflow-hidden">
+          {/* Scrollable grid area */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-7">
           <div
-            className="pt-2 pb-2 grid gap-x-3 gap-y-2 w-full flex-none"
-            style={{ gridTemplateColumns: '6rem 1fr', gridTemplateRows: 'repeat(9, auto)', alignItems: 'stretch' }}
+            className="pt-2 pb-2 grid gap-x-3 gap-y-2 w-full"
+            style={{ gridTemplateColumns: '6rem 1fr', gridTemplateRows: `repeat(${STAT_FIELDS.length}, auto)`, alignItems: 'stretch' }}
           >
 
             {/* Left: VGR → FTH, one per row */}
             {STAT_FIELDS.map(({ key, label, icon }, i) => (
-              <div key={key} className="flex flex-col gap-1.5" style={{ gridColumn: 1, gridRow: i + 1 }}>
+              <div key={key} className="flex flex-col gap-2" style={{ gridColumn: 1, gridRow: i + 1 }}>
                 <label className="flex items-center gap-1.5 text-xs text-[#b8b8b8] uppercase tracking-wider leading-none">
                   <img src={icon} alt={label} className="w-5 h-5 object-contain" />
                   {label}
@@ -417,17 +438,9 @@ function App() {
               </div>
             ))}
 
-            {/* Right: rows 1–7, aligned with VGR–ADP */}
-            {[
-              { key: 'soul_level', label: 'Level', type: 'number' },
-              { key: 'soul_memory', label: 'Soul Memory', type: 'number' },
-              { key: 'main_hand', label: 'Right Weapon 1', type: 'text' },
-              { key: 'off_hand', label: 'Right Weapon 2', type: 'text' },
-              { key: 'build_type', label: 'Build Type', type: 'text' },
-              { key: 'current_area', label: 'Current Area', type: 'text' },
-              { key: 'last_boss_defeated', label: 'Last Boss', type: 'text' },
-            ].map(({ key, label, type }, i) => (
-              <div key={key} className="flex flex-col gap-1.5" style={{ gridColumn: 2, gridRow: i + 1 }}>
+            {/* Right: rows 1–N, driven by game config */}
+            {GAME_CONFIG.sidebarRightFields.map(({ key, label, type }, i) => (
+              <div key={key} className="flex flex-col gap-2" style={{ gridColumn: 2, gridRow: i + 1 }}>
                 <label className="flex items-center gap-1.5 text-xs text-[#b8b8b8] uppercase tracking-wider leading-none">
                   {label}
                   <span className="w-5 h-5 shrink-0 inline-block" />
@@ -442,8 +455,8 @@ function App() {
               </div>
             ))}
 
-            {/* Notes spans rows 8–9 (aligns with INT + FTH), textarea fills the height */}
-            <div className="flex flex-col gap-1.5 overflow-hidden" style={{ gridColumn: 2, gridRow: '8 / span 2', alignSelf: 'stretch', marginTop: 0 }}>
+            {/* Notes spans the last two rows, aligning with the bottom stat pair */}
+            <div className="flex flex-col gap-2 overflow-hidden" style={{ gridColumn: 2, gridRow: `${GAME_CONFIG.sidebarRightFields.length + 1} / span 2`, alignSelf: 'stretch', marginTop: 0 }}>
               <label className="flex items-center gap-1.5 text-xs text-[#b8b8b8] uppercase tracking-wider leading-none">
                 Notes
                 <span className="w-5 h-5 shrink-0 inline-block" />
@@ -452,14 +465,15 @@ function App() {
                 value={stats.notes}
                 onChange={e => handleStatChange('notes', e.target.value)}
                 className="flex-1 bg-neutral-700/70 rounded-md px-2 py-1.5 text-xs text-neutral-100 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-yellow-600/60 w-full resize-none"
-                placeholder="—"
+                placeholder="Rings, spells, consumables, anything else..."
               />
             </div>
 
           </div>{/* end grid */}
+          </div>{/* end scrollable grid area */}
 
-          {/* Clear Stats — immediately below grid */}
-          <div className="pt-4 pb-5 flex-none">
+          {/* Clear Stats — pinned at bottom, outside scroll */}
+          <div className="px-7 pt-3 pb-7 flex-none">
             <button
               onClick={handleClearStats}
               className="w-full bg-yellow-600 hover:bg-yellow-500 active:bg-yellow-700 text-neutral-900 font-semibold text-xs rounded-md py-2 transition-colors"
@@ -493,9 +507,23 @@ function App() {
           </button>
 
           <h1 className="flex items-center gap-2 text-yellow-500 text-2xl leading-tight tracking-wide" style={{ fontFamily: 'OptimusPrinceps, serif' }}>
-            Scholar
+            {GAME_CONFIG.botName}
             <span className="text-neutral-500 text-xl">·</span>
-            <span className="text-neutral-400 text-xl">Dark Souls II</span>
+            <span className="relative inline-flex items-center gap-0.5">
+              <select
+                value={gameId}
+                onChange={e => handleGameSwitch(e.target.value)}
+                className="text-neutral-400 text-xl bg-transparent border-none outline-none cursor-pointer hover:text-neutral-200 transition-colors appearance-none"
+                style={{ fontFamily: 'OptimusPrinceps, serif' }}
+              >
+                {Object.entries(ALL_CONFIGS).map(([id, cfg]) => (
+                  <option key={id} value={id} className="bg-neutral-800 text-neutral-200">{cfg.gameName}</option>
+                ))}
+              </select>
+              <svg className="w-3 h-3 text-neutral-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              </svg>
+            </span>
           </h1>
 
           {messages.length > 0 && (
@@ -533,33 +561,29 @@ function App() {
 
               <div className="text-center">
                 <h2 className="text-yellow-500 text-[3.25rem] -mb-1" style={{ fontFamily: 'OptimusPrinceps, serif' }}>
-                  Scholar
+                  {GAME_CONFIG.botName}
                 </h2>
                 <p className="text-neutral-500 text-base tracking-widest uppercase mb-3" style={{ fontFamily: 'OptimusPrinceps, serif' }}>
-                  Seek Guidance from the Archives
+                  {GAME_CONFIG.tagline}
                 </p>
                 <p className="text-neutral-400 text-sm max-w-sm mx-auto leading-relaxed mb-1">
-                  AI wiki companion for Scholar of the First Sin
+                  {GAME_CONFIG.description}
                 </p>
               </div>
 
               <div className="w-full max-w-md grid grid-cols-2 gap-2">
-                {[
-                  { label: 'Soul Memory explained', q: 'How does Soul Memory work and how does it affect matchmaking?' },
-                  { label: 'Check Soul Memory Tier', action: handleCheckSoulMemory },
-                  { label: 'How to beat The Pursuer?', q: 'How do I beat The Pursuer boss in Dark Souls 2?' },
-                  { label: 'Best starting class?', q: 'What is the best starting class for a beginner in Dark Souls 2?' },
-                  { label: 'Where to farm souls?', q: 'What are the best places to farm souls early on?' },
-                  { label: 'ADP & iframes explained', q: 'How does Adaptability affect dodge roll iframes?' },
-                ].map(({ label, q, action }) => (
+                {(() => {
+                  const handlers = { handleCheckSoulMemory };
+                  return GAME_CONFIG.suggestedQuestions.map(({ label, q, action }) => (
                   <button
                     key={label}
-                    onClick={() => action ? action() : handleSend(q)}
+                    onClick={() => action ? handlers[action]?.() : handleSend(q)}
                     className="text-center px-5 py-3.5 rounded-xl bg-neutral-800 hover:bg-neutral-700/80 text-neutral-400 hover:text-neutral-200 text-sm transition-all leading-snug shadow-sm hover:shadow-md"
                   >
                     {label}
                   </button>
-                ))}
+                ));
+              })()}
               </div>
             </div>
           )}
@@ -570,13 +594,25 @@ function App() {
               className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
             >
               <div
-                className={`max-w-[75%] px-4 py-2.5 text-sm leading-relaxed break-words ${
+                className={`relative max-w-[75%] px-4 py-2.5 text-sm leading-relaxed break-words ${
                   msg.role === 'user'
                     ? 'bg-yellow-700/80 text-neutral-100 rounded-2xl rounded-br-none whitespace-pre-wrap'
                     : 'bg-neutral-800 text-neutral-200 rounded-2xl rounded-bl-none shadow-md shadow-black/30'
                 }`}
               >
                 {msg.role === 'user' ? msg.content : renderMessageContent(msg.content, i, loading && i === messages.length - 1)}
+                {/* Chat bubble tail — CSS border triangle (no clip-path, no isolated compositing) */}
+                <div style={msg.role === 'user' ? {
+                  position: 'absolute', bottom: 0, right: -8,
+                  width: 0, height: 0,
+                  borderLeft: '8px solid rgba(180, 83, 9, 0.8)',
+                  borderTop: '12px solid transparent',
+                } : {
+                  position: 'absolute', bottom: 0, left: -8,
+                  width: 0, height: 0,
+                  borderRight: '8px solid rgb(38, 38, 38)',
+                  borderTop: '12px solid transparent',
+                }} />
               </div>
               {msg.role === 'assistant' && i === messages.length - 1 && !loading && (() => {
                 const opts = parseNumberedOptions(msg.content);
@@ -634,6 +670,10 @@ function App() {
                         setLevelStep('count');
                         setLevelCount('');
                         setLevelModalOpen(true);
+                      } else if (cmd === '/clear') {
+                        // Execute immediately — no arguments needed
+                        setMessages([]);
+                        setInput('');
                       } else {
                         const newVal = cmd + ' ';
                         setInput(newVal);
@@ -662,7 +702,7 @@ function App() {
               onKeyDown={handleKeyDown}
               rows={1}
               disabled={loading}
-              placeholder="Ask the Scholar... (Enter to send, Shift+Enter for new line, / for commands)"
+              placeholder={GAME_CONFIG.placeholderText}
               className="flex-1 bg-neutral-700/70 rounded-xl px-3 py-2.5 text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-yellow-600/50 resize-none leading-relaxed disabled:opacity-50"
               style={{ minHeight: '42px', maxHeight: '160px', overflowY: 'auto' }}
               onInput={e => {
