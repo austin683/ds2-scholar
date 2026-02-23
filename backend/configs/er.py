@@ -83,6 +83,26 @@ _MECHANIC_TERM_MAP: dict = {
     "attributes":   ["Stats.md"],
     "stats":        ["Stats.md"],
 
+    # ── Classes / starting stats ──────────────────────────────────────────────
+    "class":            ["Classes.md"],
+    "classes":          ["Classes.md"],
+    "starting class":   ["Classes.md"],
+    "starting classes": ["Classes.md"],
+    "starting stats":   ["Classes.md"],
+    "starting stat":    ["Classes.md"],
+    "base stats":       ["Classes.md"],
+    "which class":      ["Classes.md"],
+    "best class":       ["Classes.md"],
+    # Individual class names → their dedicated page + Classes.md for comparison.
+    # "hero", "warrior", "bandit" omitted — too generic (boss names, enemy types).
+    "vagabond":     ["Vagabond.md",     "Classes.md"],
+    "astrologer":   ["Astrologer.md",   "Classes.md"],
+    "prisoner":     ["Prisoner.md",     "Classes.md"],
+    "confessor":    ["Confessor.md",    "Classes.md"],
+    "wretch":       ["Wretch.md",       "Classes.md"],
+    "prophet":      ["Prophet.md",      "Classes.md"],
+    "samurai":      ["Samurai.md",      "Classes.md"],
+
     # ── Status effects ────────────────────────────────────────────────────────
     "bleed":        ["Hemorrhage.md"],
     "blood loss":   ["Hemorrhage.md"],

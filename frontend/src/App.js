@@ -25,12 +25,10 @@ const parseNumberedOptions = (text) => {
   }
   if (firstIdx === -1) return [];
 
-  // The nearest non-empty line before "1." must end with "?" to be a clarifying question
-  let prevLine = '';
-  for (let i = firstIdx - 1; i >= 0; i--) {
-    if (lines[i].trim()) { prevLine = lines[i].trim(); break; }
-  }
-  if (!prevLine.endsWith('?')) return [];
+  // Any non-empty line before "1." must end with "?" — guards against informational
+  // numbered lists while still matching patterns like "Could you clarify? For example:"
+  const hasPrecedingQuestion = lines.slice(0, firstIdx).some(l => l.trim().endsWith('?'));
+  if (!hasPrecedingQuestion) return [];
 
   const opts = {};
   for (const line of lines) {
@@ -629,7 +627,7 @@ function App() {
                     {opts.map((opt, oi) => (
                       <button
                         key={oi}
-                        onClick={() => handleSend(String(oi + 1))}
+                        onClick={() => handleSend(opt)}
                         title={opt}
                         className="text-xs text-neutral-500 hover:text-yellow-400 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700/80 rounded px-1.5 py-0.5 transition-colors leading-none"
                       >
