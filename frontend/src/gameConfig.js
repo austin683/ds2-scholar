@@ -7,6 +7,11 @@ export const GAME_CONFIG = {
   // ── Identity ────────────────────────────────────────────────────────────────
   gameId: 'ds2',
   gameName: 'Dark Souls II',
+  displayFont: "'OptimusPrinceps', serif",
+  theme: {
+    divider: '#ca8a04',
+    userBubbleTail: 'rgba(180, 83, 9, 0.8)',
+  },
   botName: 'Scholar',
   tagline: 'Seek Guidance from the Archives',
   description: 'AI wiki companion for Scholar of the First Sin',

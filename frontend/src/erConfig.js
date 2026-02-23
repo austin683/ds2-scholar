@@ -7,6 +7,11 @@ export const GAME_CONFIG = {
   // ── Identity ────────────────────────────────────────────────────────────────
   gameId: 'er',
   gameName: 'Elden Ring',
+  displayFont: "'Cinzel', serif",
+  theme: {
+    divider: '#d4881c',
+    userBubbleTail: 'rgba(160, 100, 18, 0.85)',
+  },
   botName: 'Scholar',
   tagline: 'Seek Your Path to the Erdtree',
   description: 'AI wiki companion for Elden Ring',
@@ -18,6 +23,11 @@ export const GAME_CONFIG = {
   // ── Multiplayer system ──────────────────────────────────────────────────────
   // Elden Ring uses level-range matchmaking, not a tier-based Soul Memory system.
   hasSoulMemory: false,
+
+  // ── Stat icons ──────────────────────────────────────────────────────────────
+  // Set to false when individual stat icon PNGs are not available.
+  // Icons exist in-game but are not yet sourced as standalone files.
+  hasStatIcons: false,
 
   // ── Slash commands ──────────────────────────────────────────────────────────
   slashCommands: [
@@ -81,7 +91,7 @@ export const GAME_CONFIG = {
   suggestedQuestions: [
     { label: 'How to start in Limgrave?', q: 'What should I do first in Limgrave as a new player?' },
     { label: 'Best starting class?',      q: 'What is the best starting class for a beginner in Elden Ring?' },
-    { label: 'How do Ashes of War work?', q: 'How do Ashes of War work and how do I change them?' },
+    { label: 'Ashes of War guide',         q: 'How do Ashes of War work and how do I change them?' },
     { label: 'Bleed build guide',         q: 'How do I build a bleed/hemorrhage build in Elden Ring?' },
     { label: 'How to beat Malenia?',      q: 'How do I beat Malenia, Blade of Miquella?' },
     { label: 'Where to find Smithing Stones?', q: 'Where can I find Smithing Stones to upgrade my weapons?' },

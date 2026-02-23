@@ -13,6 +13,26 @@ html, body {
   background-color: #171717; /* neutral-900 */
 }
 
+/* ── Elden Ring theme overrides ─────────────────────────────────────────────
+   Replaces DS2's greenish-yellow (#eab308) with Erdtree amber-gold (#d4962a).
+   Attribute selector [data-game="er"] (specificity 0,1,0) beats Tailwind's
+   class-only rules (also 0,1,0) because our rules appear later in source order,
+   and hover/active/focus pseudo-classes add equal weight to both sides.
+   ───────────────────────────────────────────────────────────────────────────*/
+[data-game="er"] .text-yellow-500                     { color: #f2a62e; }
+[data-game="er"] .text-yellow-400                     { color: #f7be50; }
+[data-game="er"] .text-yellow-300                     { color: #fad070; }
+[data-game="er"] .text-yellow-200                     { color: #fce090; }
+[data-game="er"] .bg-yellow-600                       { background-color: #d4881c; }
+[data-game="er"] .bg-yellow-700\/80                   { background-color: rgba(160, 100, 18, 0.8); }
+[data-game="er"] .hover\:bg-yellow-500:hover          { background-color: #e89a28; }
+[data-game="er"] .hover\:bg-yellow-600:hover          { background-color: #d4881c; }
+[data-game="er"] .active\:bg-yellow-700:active        { background-color: #b07015; }
+[data-game="er"] .hover\:text-yellow-400:hover        { color: #f7be50; }
+[data-game="er"] .border-yellow-700\/50               { border-color: rgba(160, 100, 18, 0.5); }
+[data-game="er"] .focus\:ring-yellow-600\/50:focus    { --tw-ring-color: rgba(212, 136, 28, 0.5); }
+[data-game="er"] .focus\:ring-yellow-600\/60:focus    { --tw-ring-color: rgba(212, 136, 28, 0.6); }
+
 /* Remove number input spinners */
 input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button {

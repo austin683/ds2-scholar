@@ -394,7 +394,7 @@ function App() {
   };
 
   return (
-    <div className="flex h-screen bg-neutral-900 text-neutral-100 overflow-hidden" style={{ minHeight: '620px' }}>
+    <div data-game={gameId} className="flex h-screen bg-neutral-900 text-neutral-100 overflow-hidden" style={{ minHeight: '620px' }}>
 
       {/* Sidebar */}
       <aside
@@ -407,8 +407,8 @@ function App() {
           {/* Title — pinned top */}
           <div className="absolute top-0 left-0 right-0 h-[72px] flex items-end justify-center pb-4 pointer-events-none z-10">
             <div className="flex flex-col items-center gap-1">
-                <div className="text-yellow-500 text-2xl leading-tight" style={{ fontFamily: 'OptimusPrinceps, serif' }}>Player Stats</div>
-                <div className="h-[1.5px] w-44" style={{ background: 'linear-gradient(to right, transparent, #ca8a04ff, transparent)' }} />
+                <div className="text-yellow-500 text-2xl leading-tight" style={{ fontFamily: GAME_CONFIG.displayFont }}>Player Stats</div>
+                <div className="h-[1.5px] w-44" style={{ background: `linear-gradient(to right, transparent, ${GAME_CONFIG.theme.divider}, transparent)` }} />
               </div>
           </div>
 
@@ -424,8 +424,8 @@ function App() {
             {/* Left: VGR → FTH, one per row */}
             {STAT_FIELDS.map(({ key, label, icon }, i) => (
               <div key={key} className="flex flex-col gap-2" style={{ gridColumn: 1, gridRow: i + 1 }}>
-                <label className="flex items-center gap-1.5 text-xs text-[#b8b8b8] uppercase tracking-wider leading-none">
-                  <img src={icon} alt={label} className="w-5 h-5 object-contain" />
+                <label className="flex items-center gap-1.5 text-xs text-[#b8b8b8] uppercase tracking-wider leading-none min-h-5">
+                  {GAME_CONFIG.hasStatIcons !== false && <img src={icon} alt={label} className="w-5 h-5 object-contain" />}
                   {label}
                 </label>
                 <input
@@ -506,20 +506,26 @@ function App() {
             </svg>
           </button>
 
-          <h1 className="flex items-center gap-2 text-yellow-500 text-2xl leading-tight tracking-wide" style={{ fontFamily: 'OptimusPrinceps, serif' }}>
+          <h1 className="flex items-center gap-2 text-yellow-500 text-2xl leading-tight tracking-wide" style={{ fontFamily: GAME_CONFIG.displayFont }}>
             {GAME_CONFIG.botName}
             <span className="text-neutral-500 text-xl">·</span>
-            <span className="relative inline-flex items-center gap-0.5">
-              <select
-                value={gameId}
-                onChange={e => handleGameSwitch(e.target.value)}
-                className="text-neutral-400 text-xl bg-transparent border-none outline-none cursor-pointer hover:text-neutral-200 transition-colors appearance-none"
-                style={{ fontFamily: 'OptimusPrinceps, serif' }}
-              >
-                {Object.entries(ALL_CONFIGS).map(([id, cfg]) => (
-                  <option key={id} value={id} className="bg-neutral-800 text-neutral-200">{cfg.gameName}</option>
-                ))}
-              </select>
+            <span className="inline-flex items-center gap-0.5">
+              {/* Invisible mirror span sizes the select to the current game name width */}
+              <span className="relative">
+                <span className="invisible select-none text-xl" style={{ fontFamily: GAME_CONFIG.displayFont }}>
+                  {GAME_CONFIG.gameName}
+                </span>
+                <select
+                  value={gameId}
+                  onChange={e => handleGameSwitch(e.target.value)}
+                  className="absolute inset-0 w-full text-neutral-400 text-xl bg-transparent border-none outline-none cursor-pointer hover:text-neutral-200 transition-colors appearance-none"
+                  style={{ fontFamily: GAME_CONFIG.displayFont }}
+                >
+                  {Object.entries(ALL_CONFIGS).map(([id, cfg]) => (
+                    <option key={id} value={id} className="bg-neutral-800 text-neutral-200">{cfg.gameName}</option>
+                  ))}
+                </select>
+              </span>
               <svg className="w-3 h-3 text-neutral-600 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
               </svg>
@@ -560,10 +566,10 @@ function App() {
               </div>
 
               <div className="text-center">
-                <h2 className="text-yellow-500 text-[3.25rem] -mb-1" style={{ fontFamily: 'OptimusPrinceps, serif' }}>
+                <h2 className="text-yellow-500 text-[3.25rem] -mb-1" style={{ fontFamily: GAME_CONFIG.displayFont }}>
                   {GAME_CONFIG.botName}
                 </h2>
-                <p className="text-neutral-500 text-base tracking-widest uppercase mb-3" style={{ fontFamily: 'OptimusPrinceps, serif' }}>
+                <p className="text-neutral-500 text-base tracking-widest uppercase mb-3" style={{ fontFamily: GAME_CONFIG.displayFont }}>
                   {GAME_CONFIG.tagline}
                 </p>
                 <p className="text-neutral-400 text-sm max-w-sm mx-auto leading-relaxed mb-1">
@@ -605,7 +611,7 @@ function App() {
                 <div style={msg.role === 'user' ? {
                   position: 'absolute', bottom: 0, right: -8,
                   width: 0, height: 0,
-                  borderLeft: '8px solid rgba(180, 83, 9, 0.8)',
+                  borderLeft: `8px solid ${GAME_CONFIG.theme.userBubbleTail}`,
                   borderTop: '12px solid transparent',
                 } : {
                   position: 'absolute', bottom: 0, left: -8,
@@ -741,7 +747,7 @@ function App() {
             >
               <h2
                 className="text-yellow-500 text-3xl text-center"
-                style={{ fontFamily: 'OptimusPrinceps, serif' }}
+                style={{ fontFamily: GAME_CONFIG.displayFont }}
               >
                 Level Up
               </h2>
@@ -798,7 +804,7 @@ function App() {
                     </p>
                     <p
                       className={`text-[1.35rem] ${remaining > 0 ? 'text-yellow-400' : 'text-neutral-500'}`}
-                      style={{ fontFamily: 'OptimusPrinceps, serif' }}
+                      style={{ fontFamily: GAME_CONFIG.displayFont }}
                     >
                       {remaining} level{remaining !== 1 ? 's' : ''} remaining
                     </p>
@@ -813,7 +819,7 @@ function App() {
                       return (
                         <div key={key} className="flex flex-col items-center gap-1.5">
                           <label className="flex items-center gap-1.5 text-xs text-neutral-400 uppercase tracking-wider">
-                            <img src={icon} alt={label} className="w-8 h-8 object-contain" />
+                            {GAME_CONFIG.hasStatIcons !== false && <img src={icon} alt={label} className="w-8 h-8 object-contain" />}
                             {label}
                           </label>
                           <div className="flex items-center gap-2">
