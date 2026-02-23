@@ -14,7 +14,7 @@ import os
 from backend.game_config import GameConfig, SoulMemoryConfig
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_KB_DIR = os.path.join(_BASE_DIR, "knowledge_base")
+_KB_DIR = os.path.join(_BASE_DIR, "knowledge_base_ds2")
 
 
 def _kb_exists(fname: str) -> bool:

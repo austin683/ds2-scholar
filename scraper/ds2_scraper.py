@@ -7,7 +7,7 @@ import html2text
 
 # Config
 BASE_URL = "https://darksouls2.wiki.fextralife.com"
-OUTPUT_DIR = os.path.expanduser("~/Desktop/ds2_scholar/knowledge_base")
+OUTPUT_DIR = os.path.expanduser("~/Desktop/ds2_scholar/knowledge_base_ds2")
 DELAY = 1.5
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
