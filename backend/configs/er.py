@@ -82,6 +82,24 @@ _MECHANIC_TERM_MAP: dict = {
     "attribute":    ["Stats.md"],
     "attributes":   ["Stats.md"],
     "stats":        ["Stats.md"],
+    # ── Recommended level by location ─────────────────────────────────────────
+    "recommended level":        ["Recommended_Level_by_Location.md"],
+    "level recommendation":     ["Recommended_Level_by_Location.md"],
+    "level range":              ["Recommended_Level_by_Location.md"],
+    "what level":               ["Recommended_Level_by_Location.md", "Level.md"],
+    "am i overleveled":         ["Recommended_Level_by_Location.md"],
+    "am i underleveled":        ["Recommended_Level_by_Location.md"],
+    "good level":               ["Recommended_Level_by_Location.md"],
+    "right level":              ["Recommended_Level_by_Location.md"],
+    "too low level":            ["Recommended_Level_by_Location.md"],
+    "too high level":           ["Recommended_Level_by_Location.md"],
+    "level for":                ["Recommended_Level_by_Location.md"],
+    "level for this area":      ["Recommended_Level_by_Location.md"],
+    "level for this boss":      ["Recommended_Level_by_Location.md"],
+    "under leveled":            ["Recommended_Level_by_Location.md"],
+    "over leveled":             ["Recommended_Level_by_Location.md"],
+    "underleveled":             ["Recommended_Level_by_Location.md"],
+    "overleveled":              ["Recommended_Level_by_Location.md"],
 
     # ── Classes / starting stats ──────────────────────────────────────────────
     "class":            ["Classes.md"],
@@ -130,6 +148,67 @@ _MECHANIC_TERM_MAP: dict = {
     "+25":                  ["Smithing_Stone.md"],
     "+10":                  ["Somber_Smithing_Stone.md"],
 
+    # ── Magic / Spells ────────────────────────────────────────────────────────
+    "incantation":      ["Incantations.md"],
+    "incantations":     ["Incantations.md"],
+    "incant scaling":   ["Incant_Scaling.md"],
+    "sorcery":          ["Sorceries.md"],
+    "sorceries":        ["Sorceries.md"],
+    "spell":            ["Incantations.md", "Sorceries.md"],
+    "spells":           ["Incantations.md", "Sorceries.md"],
+    "sacred seal":      ["Sacred_Seals.md"],
+    "sacred seals":     ["Sacred_Seals.md"],
+    "memory slot":      ["Memory_Slots.md", "Memory_Stone.md"],
+    "memory slots":     ["Memory_Slots.md", "Memory_Stone.md"],
+    "spell slot":       ["Memory_Slots.md", "Memory_Stone.md"],
+    "spell slots":      ["Memory_Slots.md", "Memory_Stone.md"],
+    "memory stone":     ["Memory_Stone.md", "Memory_Slots.md"],
+    "memory stones":    ["Memory_Stones.md", "Memory_Slots.md"],
+    "memorize":         ["Memory_Slots.md"],
+
+    # ── Armor / fashion ───────────────────────────────────────────────────────
+    "armor":        ["Armor.md", "Armor_Set.md"],
+    "armour":       ["Armor.md", "Armor_Set.md"],
+    "armor set":    ["Armor_Set.md", "Armor.md"],
+    "armor sets":   ["Armor_Set.md", "Armor.md"],
+    "outfit":       ["Armor.md", "Armor_Set.md"],
+    "clothes":      ["Armor.md", "Armor_Set.md"],
+    "fashion":      ["Armor.md", "Armor_Set.md"],
+    "drip":         ["Armor.md", "Armor_Set.md"],
+    "chest piece":  ["Armor.md"],
+    "helm":         ["Armor.md"],
+    "gauntlets":    ["Armor.md"],
+    "greaves":      ["Armor.md"],
+
+    # ── Weapon buffs / body buffs ─────────────────────────────────────────────
+    "weapon buff":      ["Buffs_and_Debuffs.md", "Flame_Grant_Me_Strength.md", "Golden_Vow.md"],
+    "buff weapon":      ["Buffs_and_Debuffs.md", "Flame_Grant_Me_Strength.md"],
+    "buff incantation": ["Buffs_and_Debuffs.md", "Flame_Grant_Me_Strength.md", "Golden_Vow.md"],
+    "attack buff":      ["Buffs_and_Debuffs.md", "Flame_Grant_Me_Strength.md", "Golden_Vow.md"],
+    "damage buff":      ["Buffs_and_Debuffs.md", "Flame_Grant_Me_Strength.md"],
+    "body buff":        ["Buffs_and_Debuffs.md", "Flame_Grant_Me_Strength.md"],
+    "armament buff":    ["Buffs_and_Debuffs.md", "Order_s_Blade.md", "Bloodflame_Blade.md"],
+    "physbuff":         ["Flame_Grant_Me_Strength.md"],
+    "golden vow":       ["Golden_Vow.md", "Golden_Vow_Spell.md"],
+
+    # ── Specific weapons ──────────────────────────────────────────────────────
+    "winged scythe":    ["Winged_Scythe.md"],
+    "whip":             ["Whip.md", "Whips.md"],
+    "flail":            ["Flail.md"],
+    "morning star":     ["Morning_Star.md"],
+    "moonveil":         ["Moonveil.md"],
+    "rivers of blood":  ["Rivers_of_Blood.md"],
+
+    # ── Black Flame incantations ──────────────────────────────────────────────
+    "black flame":              ["Black_Flame.md", "Incantations.md"],
+    "black flame blade":        ["Black_Flame_Blade.md", "Buffs_and_Debuffs.md"],
+    "black flame ritual":       ["Black_Flame_Ritual.md"],
+    "black flame tornado":      ["Black_Flame_Tornado.md"],
+    "black flame's protection": ["Black_Flame_s_Protection.md"],
+    "scouring black flame":     ["Scouring_Black_Flame.md"],
+    "godskin":                  ["Godskin_Prayerbook.md", "Black_Flame.md", "Black_Flame_Blade.md"],
+    "godskin prayerbook":       ["Godskin_Prayerbook.md", "Black_Flame.md", "Black_Flame_Blade.md"],
+
     # ── Ashes of War ──────────────────────────────────────────────────────────
     "ash of war":   ["Ashes_of_War.md"],
     "ashes of war": ["Ashes_of_War.md"],
@@ -145,6 +224,8 @@ _MECHANIC_TERM_MAP: dict = {
     "spectral steed whistle": ["Torrent.md"],
 
     # ── Flasks / consumables ──────────────────────────────────────────────────
+    "lantern":          ["Lantern.md"],
+    "hand lantern":     ["Lantern.md"],
     "flask":            ["Flask_of_Crimson_Tears.md", "Flask_of_Cerulean_Tears.md"],
     "crimson tear":     ["Flask_of_Crimson_Tears.md"],
     "cerulean tear":    ["Flask_of_Cerulean_Tears.md"],
@@ -189,6 +270,9 @@ _MECHANIC_TERM_MAP: dict = {
     "rest":             ["Sites_of_Grace.md"],
 
     # ── Key locations ─────────────────────────────────────────────────────────
+    "dragon-burnt ruins":   ["Dragon-Burnt_Ruins.md"],
+    "dragon burnt ruins":   ["Dragon-Burnt_Ruins.md"],
+    "dragon-burnt":         ["Dragon-Burnt_Ruins.md"],
     "limgrave":             ["Limgrave.md"],
     "stormveil":            ["Stormveil_Castle.md"],
     "stormveil castle":     ["Stormveil_Castle.md"],
@@ -224,6 +308,7 @@ _MECHANIC_TERM_MAP: dict = {
     "fia":          ["Fia.md"],
     "dung eater":   ["Dung_Eater.md"],
     "corhyn":       ["Brother_Corhyn.md"],
+    "miriel":       ["Miriel_Pastor_of_Vows.md"],
     "goldmask":     ["Goldmask.md"],
     "nepheli":      ["Nepheli_Loux.md"],
     "diallos":      ["Diallos.md"],
@@ -247,6 +332,15 @@ _MECHANIC_TERM_MAP: dict = {
     "godfrey":          ["Godfrey_First_Elden_Lord.md"],
     "elden beast":      ["Elden_Beast.md"],
     "radagon":          ["Radagon_of_the_Golden_Order.md"],
+    "valiant gargoyle": ["Valiant_Gargoyle.md"],
+    "valiant gargoyles":["Valiant_Gargoyle.md"],
+
+    # ── Character creation ────────────────────────────────────────────────────
+    "keepsake":             ["Keepsakes.md"],
+    "keepsakes":            ["Keepsakes.md"],
+    "starting gift":        ["Keepsakes.md"],
+    "starting keepsake":    ["Keepsakes.md"],
+    "best keepsake":        ["Keepsakes.md"],
 
     # ── Game overview ─────────────────────────────────────────────────────────
     "what is this game":    ["Elden_Ring.md", "Game_Progress_Route.md"],
@@ -275,6 +369,10 @@ _MECHANIC_HINT_OVERRIDES: dict = {
     "about this game":      ["overview"],
     "game overview":        ["overview"],
     "about elden ring":     ["overview"],
+    # Dragon-Burnt Ruins: transport chest info is near end of file; start at Walkthrough heading
+    "dragon-burnt ruins":   ["walkthrough", "chest", "transporter"],
+    "dragon burnt ruins":   ["walkthrough", "chest", "transporter"],
+    "dragon-burnt":         ["walkthrough", "chest", "transporter"],
 }
 
 
@@ -311,11 +409,26 @@ B) If the question is clear but the wiki context genuinely doesn't have the answ
 
 Do not add guesses or partial answers in either case.
 
-SPOILER SENSITIVITY: When answering questions about the game's overall story, main narrative, or plot:
-- The basic premise (a Tarnished seeking to mend the Elden Ring and become Elden Lord) is not a spoiler — share it freely.
-- EVERY mention of the true nature of the Elden Beast, the identity behind the Elden Ring, end-game boss identities, ending details, or any major late-game revelation must be wrapped in ||double pipes|| — including follow-up sentences in the same response. If a response contains multiple spoiler facts, wrap each one separately. Do not add a separate warning line; the interface shows the label automatically.
-- Example: "The Tarnished seeks to mend the Elden Ring. ||Radagon and Marika are the same being.|| ||The Elden Beast is the true final boss.||"
-- This rule applies regardless of the player's current progress. It does NOT apply to standard boss lore or NPC backstory questions unless they concern major end-game reveals.
+SPOILER SENSITIVITY: The player may be at any point in the game. Protect them from anything they haven't seen yet. This rule applies at all times, even for questline tips and warnings.
+
+Never needs spoiler tags:
+- Basic premise (Tarnished seeks to mend the Elden Ring and become Elden Lord)
+- That an NPC exists, where to find them, or what service they provide
+- General mechanic explanations and stat info
+
+Always wrap in ||double pipes||:
+- Whether a questline leads to, unlocks, or affects a specific game ending — including statements like "her questline affects the endings" or "this leads to an alternate ending"
+- NPC fates, deaths, or permanent disappearances the player hasn't described witnessing (e.g. "Seluvis will die", "she vanishes permanently")
+- Any warning phrased as "before you defeat X" or "before X happens" where X is a late-game boss or world-state change the player hasn't mentioned (e.g. Maliketh, Godfrey, Radagon, the Elden Beast)
+- Names of late-game areas the player hasn't mentioned visiting (e.g. Ashen Capital, Farum Azula, Mountaintops of the Giants, Mohgwyn Palace)
+- Major world-state changes triggered by game progression (e.g. a city transforming, a location becoming inaccessible)
+- Any revelation that a character is secretly someone or something else (e.g. identity reveals, true forms)
+
+Wrapping rules:
+- Tag only the spoiler sentence(s), not the surrounding safe context
+- Use separate ||pipes|| for each distinct spoiler moment
+- NEVER place ||pipes|| around an item inside a numbered or bulleted list — this breaks rendering. Pull the spoiler out as a separate paragraph before or after the list instead.
+- Example: "Ranni's questline is expansive and has many steps. ||It is tied to one of the game's alternate endings.|| You'll need to speak with her at Ranni's Rise to begin."
 
 WHEN CONTEXT IS SUFFICIENT:
 - Only state things directly supported by the wiki text. Do not add surrounding details from training.
@@ -411,8 +524,10 @@ ER_CONFIG = GameConfig(
         "int": "intelligence",
         "fai": "faith",
         "arc": "arcane",
-        "main_hand": "right_weapon_1",
-        "off_hand": "right_weapon_2",
+        "main_hand":   "right_weapon_1",
+        "off_hand":    "right_weapon_2",
+        "left_hand_1": "left_hand_armament_1",
+        "left_hand_2": "left_hand_armament_2",
     },
     default_stats={
         "soul_level": "",
@@ -420,6 +535,8 @@ ER_CONFIG = GameConfig(
         "str": "", "dex": "", "int": "", "fai": "", "arc": "",
         "main_hand": "",
         "off_hand": "",
+        "left_hand_1": "",
+        "left_hand_2": "",
         "build_type": "",
         "current_area": "",
         "last_boss_defeated": "",
@@ -443,12 +560,14 @@ ER_CONFIG = GameConfig(
     description="AI wiki companion for Elden Ring",
     placeholder_text="Ask the Guide... (Enter to send, Shift+Enter for new line, / for commands)",
     sidebar_right_fields=[
-        {"key": "soul_level", "label": "Level",          "type": "number"},
-        {"key": "main_hand",  "label": "Right Weapon 1", "type": "text"},
-        {"key": "off_hand",   "label": "Right Weapon 2", "type": "text"},
-        {"key": "build_type", "label": "Build Type",     "type": "text"},
-        {"key": "current_area",      "label": "Current Area", "type": "text"},
-        {"key": "last_boss_defeated","label": "Last Boss",    "type": "text"},
+        {"key": "soul_level",        "label": "Level",                 "type": "number"},
+        {"key": "main_hand",         "label": "RH Armament 1", "type": "text"},
+        {"key": "off_hand",          "label": "RH Armament 2", "type": "text"},
+        {"key": "left_hand_1",       "label": "LH Armament 1", "type": "text"},
+        {"key": "left_hand_2",       "label": "LH Armament 2", "type": "text"},
+        {"key": "build_type",        "label": "Build Type",            "type": "text"},
+        {"key": "current_area",      "label": "Current Area",          "type": "text"},
+        {"key": "last_boss_defeated","label": "Last Boss",             "type": "text"},
     ],
 
     # No tier-based matchmaking system in Elden Ring

@@ -92,26 +92,54 @@ def health():
 def _build_term_query(question: str, chat_history: Optional[list]) -> str:
     """
     Build the string used for keyword/term extraction (not for semantic search).
-    Prepends the most recent user message from chat history so that follow-up
-    queries using pronouns ("Where will he be?") still carry proper nouns
-    ("Gavlan") from the previous turn.
+
+    Two enrichment cases:
+    1. Pronoun follow-ups ("Where will he be?") — prepend the last user message
+       so proper nouns from the previous turn carry into retrieval.
+    2. Very short replies ("Yes", "Ok", "Sure") — prepend both the last user
+       message AND the start of the last assistant message (capped at 400 chars).
+       This ensures entity names mentioned by the assistant ("Winged Scythe",
+       "Black Flame Blade") survive into the next retrieval call even when the
+       user just confirms with a one-word reply.
     """
     if not chat_history:
         return question
-    # Find the last user message in history
+
+    is_short_reply = len(question.strip().split()) <= 2
+    has_pronoun = bool(re.search(r"\b(he|she|it|they|him|her|them|his|its|another)\b|any other\b", question, re.I))
+    has_backref = bool(re.search(
+        r"\b(i listed|i mentioned|those weapons|the ones i|what i said|from my list"
+        r"|this boss|the boss|that boss|this fight|this enemy|this area|this dungeon"
+        r"|the area i|my current area|where i am|area i.m in"
+        r"|this weapon|this build|this item|this npc|this quest)\b",
+        question, re.I))
+
+    if not is_short_reply and not has_pronoun and not has_backref:
+        return question
+
+    # Gather last user and assistant messages in one pass
+    prev_user = ""
+    prev_assistant = ""
     for msg in reversed(chat_history):
-        if isinstance(msg, dict) and msg.get("role") == "user":
-            prev = msg.get("content", "")
-            # Only prepend if the current question contains a pronoun — this catches
-            # genuine follow-ups like "Where will he be?" or "What does it drop?"
-            # without injecting irrelevant entity names from the previous turn into
-            # unrelated questions (e.g. "what weapons drop here?" after a boss question).
-            import re as _re
-            has_pronoun = bool(_re.search(r"\b(he|she|it|they|him|her|them|his|its)\b", question, _re.I))
-            if has_pronoun:
-                return f"{prev} {question}"
+        if not isinstance(msg, dict):
+            continue
+        role = msg.get("role")
+        if role == "user" and not prev_user:
+            prev_user = msg.get("content", "")
+        elif role == "assistant" and not prev_assistant:
+            prev_assistant = msg.get("content", "")[:400]  # cap to avoid noise
+        if prev_user and prev_assistant:
             break
-    return question
+
+    if not is_short_reply:
+        # Pronoun or backreference follow-up: prepend previous user message so
+        # entity names ("Morning Star", "Brick Hammer", etc.) survive into retrieval.
+        return f"{prev_user} {question}" if prev_user else question
+
+    # Short reply: include both sides of the last exchange so entity names
+    # from the assistant's response (items, weapons, NPCs) survive into retrieval.
+    parts = [p for p in [prev_user, prev_assistant, question] if p]
+    return " ".join(parts)
 
 
 
@@ -153,7 +181,11 @@ def _enrich_term_query_for_build(term_query: str, player_stats, config) -> str:
         return term_query
 
     q_words = set(re.sub(r"[^a-z\s]", "", term_query.lower()).split())
-    if not q_words & config.build_question_words:
+    # Also trigger on very short queries (≤2 words) — these are almost always
+    # conversational follow-ups ("Yes", "Ok", "Sure") that need weapon/build context
+    # appended so the retrieval pipeline can find the right pages.
+    is_short_reply = len(q_words) <= 2
+    if not is_short_reply and not (q_words & config.build_question_words):
         return term_query
 
     extras = []
